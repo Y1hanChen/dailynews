@@ -31,6 +31,7 @@ SOURCE_CONFIG = [
         "name": "Thinking Machines Lab",
         "short_name": "Thinking Machines",
         "kind": "rss",
+        "section": "ai",
         "url": "https://thinkingmachines.ai/index.xml",
         "tone": "coral",
         "description": "Connectionism 研究博客与官方公告",
@@ -40,9 +41,62 @@ SOURCE_CONFIG = [
         "name": "机器之心 · 知乎",
         "short_name": "机器之心",
         "kind": "zhihu",
+        "section": "ai",
         "url": "https://www.zhihu.com/api/v4/columns/jiqizhixin/articles",
         "tone": "teal",
         "description": "中文 AI 文章与论文解读",
+    },
+    {
+        "id": "qbit-zhihu",
+        "name": "量子位 · 知乎",
+        "short_name": "量子位",
+        "kind": "zhihu",
+        "section": "ai",
+        "slug": "qbitai",
+        "url": "https://www.zhihu.com/api/v4/columns/qbitai/articles",
+        "tone": "blue",
+        "description": "量子位中文 AI 快讯与产业信息",
+    },
+    {
+        "id": "newzyuan-zhihu",
+        "name": "新智元 · 知乎",
+        "short_name": "新智元",
+        "kind": "zhihu",
+        "section": "ai",
+        "slug": "newzhiyuan",
+        "url": "https://www.zhihu.com/api/v4/columns/newzhiyuan/articles",
+        "tone": "coral",
+        "description": "新智元中文 AI 资讯与解读",
+    },
+    {
+        "id": "market-tencent",
+        "name": "腾讯行情",
+        "short_name": "市场行情",
+        "kind": "tencent",
+        "section": "market",
+        "url": "https://qt.gtimg.cn/q=sh000001,sz399001,hkHSI,usINX,usIXIC,hf_GC",
+        "tone": "yellow",
+        "description": "主要指数与黄金快照",
+    },
+    {
+        "id": "steam-specials",
+        "name": "Steam 特惠",
+        "short_name": "Steam",
+        "kind": "steam",
+        "section": "games",
+        "url": "https://store.steampowered.com/api/featuredcategories?cc=CN&l=schinese",
+        "tone": "blue",
+        "description": "当前特惠价格与折扣",
+    },
+    {
+        "id": "nba-scoreboard",
+        "name": "NBA 比赛",
+        "short_name": "NBA",
+        "kind": "nba",
+        "section": "sports",
+        "url": "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json",
+        "tone": "coral",
+        "description": "今日赛程与比赛结果",
     },
 ]
 
@@ -93,7 +147,156 @@ SAMPLE_ITEMS = {
             "sample": True,
         },
     ],
+    "qbit-zhihu": [
+        {
+            "id": "sample-qbit-zhihu",
+            "source_id": "qbit-zhihu",
+            "source": "量子位 · 知乎",
+            "tone": "blue",
+            "section": "ai",
+            "category": "AI",
+            "title": "量子位知乎专栏",
+            "summary": "连接成功后显示量子位的最新文章和 AI 产业快讯。",
+            "url": "https://zhuanlan.zhihu.com/qbitai",
+            "published_at": "2026-09-01T00:00:00+00:00",
+            "heat": 0,
+            "metrics": {},
+            "sample": True,
+        },
+    ],
+    "newzyuan-zhihu": [
+        {
+            "id": "sample-newzyuan-zhihu",
+            "source_id": "newzyuan-zhihu",
+            "source": "新智元 · 知乎",
+            "tone": "coral",
+            "section": "ai",
+            "category": "AI",
+            "title": "新智元知乎专栏",
+            "summary": "连接成功后显示新智元的最新文章和 AI 行业信息。",
+            "url": "https://zhuanlan.zhihu.com/newzhiyuan",
+            "published_at": "2026-09-01T00:00:00+00:00",
+            "heat": 0,
+            "metrics": {},
+            "sample": True,
+        },
+    ],
+    "market-tencent": [
+        {
+            "id": "sample-market-sh",
+            "source_id": "market-tencent",
+            "source": "腾讯行情",
+            "tone": "yellow",
+            "section": "market",
+            "category": "市场",
+            "title": "上证指数 · 3,979.89",
+            "summary": "最近一次可用快照：-0.16%。实时行情连接后会自动更新。",
+            "url": "https://quote.eastmoney.com/center/gridlist.html#hs_a_board",
+            "published_at": "2026-09-01T08:05:01+00:00",
+            "heat": 0,
+            "metrics": {"涨跌%": -0.16},
+            "sample": True,
+        },
+        {
+            "id": "sample-market-gold",
+            "source_id": "market-tencent",
+            "source": "腾讯行情",
+            "tone": "yellow",
+            "section": "market",
+            "category": "市场",
+            "title": "COMEX 黄金 · 4,459.70",
+            "summary": "黄金期货报价示例。个人看板接入后可继续扩展自选品种。",
+            "url": "https://quote.eastmoney.com/center/gridlist.html#futures",
+            "published_at": "2026-09-01T08:05:09+00:00",
+            "heat": 0,
+            "metrics": {"涨跌%": -0.49},
+            "sample": True,
+        },
+        {
+            "id": "sample-market-hsi",
+            "source_id": "market-tencent",
+            "source": "腾讯行情",
+            "tone": "yellow",
+            "section": "market",
+            "category": "市场",
+            "title": "恒生指数 · 25,336.75",
+            "summary": "最近一次可用快照：-0.90%。数据源恢复后显示实时变动。",
+            "url": "https://quote.eastmoney.com/center/gridlist.html#hk_market",
+            "published_at": "2026-09-01T07:50:56+00:00",
+            "heat": 0,
+            "metrics": {"涨跌%": -0.90},
+            "sample": True,
+        },
+    ],
+    "steam-specials": [
+        {
+            "id": "sample-steam-specials",
+            "source_id": "steam-specials",
+            "source": "Steam 特惠",
+            "tone": "blue",
+            "section": "games",
+            "category": "游戏",
+            "title": "Steam 今日特惠",
+            "summary": "连接 Steam 商店后显示当前折扣和价格；历史最低价需要额外的价格历史服务。",
+            "url": "https://store.steampowered.com/specials/?l=schinese",
+            "published_at": "2026-09-01T00:00:00+00:00",
+            "heat": 0,
+            "metrics": {},
+            "sample": True,
+        },
+    ],
+    "nba-scoreboard": [
+        {
+            "id": "sample-nba-scoreboard",
+            "source_id": "nba-scoreboard",
+            "source": "NBA 比赛",
+            "tone": "coral",
+            "section": "sports",
+            "category": "竞技",
+            "title": "NBA 今日赛果",
+            "summary": "连接 NBA 赛果接口后显示今日赛程、比分和比赛状态。",
+            "url": "https://www.nba.com/games",
+            "published_at": "2026-09-01T00:00:00+00:00",
+            "heat": 0,
+            "metrics": {},
+            "sample": True,
+        },
+    ],
 }
+
+# Keep the first offline render useful without pretending these are live data.
+for sample_index, sample_title in enumerate(
+    [
+        "当 AI 从工具到认知主体，我们需要警惕哪些新风险？",
+        "OpenAI 新付费方式：AI 没把活干完，钱就不用付",
+        "少数 Full Attention 层如何重塑内部计算？",
+        "今天，人工智能这个学科诞生 70 年了",
+        "刚刚，OpenClaw 2.0 来了，龙虾升级",
+        "Mac mini 缺货原因找到了！OpenAI、Anthropic 都在抢",
+        "为 Agent 重造一台游戏引擎",
+        "Astra 接管 OpenAI？第三代智能体文明的新模型",
+        "惊！AI 开始亲自动手做实验了",
+        "Claude 安全机制大翻车？",
+    ],
+    start=1,
+):
+    SAMPLE_ITEMS["jiqizhixin-zhihu"].append(
+        {
+            "id": f"sample-zhihu-extra-{sample_index}",
+            "source_id": "jiqizhixin-zhihu",
+            "source": "机器之心 · 知乎",
+            "tone": "teal",
+            "section": "ai",
+            "category": "AI",
+            "title": sample_title,
+            "summary": "离线示例缓存。恢复网络后会被知乎专栏的实时文章替换。",
+            "url": "https://zhuanlan.zhihu.com/jiqizhixin",
+            "published_at": f"2026-09-01T02:{sample_index:02d}:00+00:00",
+            "heat": 0,
+            "metrics": {},
+            "sample": True,
+        }
+    )
 
 
 class TextExtractor(HTMLParser):
@@ -171,6 +374,7 @@ def parse_rss(raw: bytes, config: dict) -> list[dict]:
                 "source_id": config["id"],
                 "source": config["name"],
                 "tone": config["tone"],
+                "section": config["section"],
                 "category": "AI",
                 "title": html.unescape(title),
                 "summary": summary,
@@ -197,6 +401,7 @@ def parse_zhihu(raw: bytes, config: dict) -> list[dict]:
                 "source_id": config["id"],
                 "source": config["name"],
                 "tone": config["tone"],
+                "section": config["section"],
                 "category": "AI",
                 "title": title,
                 "summary": strip_html(entry.get("excerpt"), 320),
@@ -205,6 +410,142 @@ def parse_zhihu(raw: bytes, config: dict) -> list[dict]:
                 "heat": voteups + comments * 2,
                 "metrics": {"赞": voteups, "评": comments},
                 "image_url": entry.get("image_url") or "",
+            }
+        )
+    return items
+
+
+MARKET_NAMES = {
+    "sh000001": "上证指数",
+    "sz399001": "深证成指",
+    "hkHSI": "恒生指数",
+    "usINX": "标普 500",
+    "usIXIC": "纳斯达克",
+    "hf_GC": "COMEX 黄金",
+}
+
+
+def parse_tencent(raw: bytes, config: dict) -> list[dict]:
+    text = raw.decode("gbk", errors="replace")
+    items: list[dict] = []
+    for match in re.finditer(r'v_([A-Za-z0-9_]+)="([^"]*)";', text):
+        code, value = match.groups()
+        fields = value.split("~") if "~" in value else value.split(",")
+        if not fields or len(fields) < 2:
+            continue
+        name = MARKET_NAMES.get(code, fields[1] if "~" in value else code)
+        try:
+            current = float(fields[3] if "~" in value else fields[0])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if "~" in value:
+            try:
+                change = float(fields[31])
+                change_pct = float(fields[32])
+                stamp = fields[30]
+            except (TypeError, ValueError, IndexError):
+                change = 0.0
+                change_pct = 0.0
+                stamp = ""
+        else:
+            try:
+                change = float(fields[1])
+                change_pct = change / (current - change) * 100 if current != change else 0.0
+            except (TypeError, ValueError, IndexError, ZeroDivisionError):
+                change = 0.0
+                change_pct = 0.0
+            stamp = fields[6] if len(fields) > 6 else ""
+        try:
+            if re.fullmatch(r"\d{14}", stamp):
+                dt = datetime.strptime(stamp, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+                published = dt.isoformat()
+            else:
+                published = datetime.now(timezone.utc).isoformat()
+        except ValueError:
+            published = datetime.now(timezone.utc).isoformat()
+        items.append(
+            {
+                "id": f"{config['id']}-{code}",
+                "source_id": config["id"],
+                "source": config["name"],
+                "tone": config["tone"],
+                "section": config["section"],
+                "category": "市场",
+                "title": f"{name} · {current:,.2f}",
+                "summary": f"最新变动 {change:+.2f}，涨跌幅 {change_pct:+.2f}%",
+                "url": "https://quote.eastmoney.com/center/gridlist.html#hs_a_board",
+                "published_at": published,
+                "heat": abs(change_pct),
+                "metrics": {"涨跌%": round(change_pct, 2)},
+            }
+        )
+    return items
+
+
+def parse_steam(raw: bytes, config: dict) -> list[dict]:
+    payload = json.loads(raw.decode("utf-8"))
+    items: list[dict] = []
+    seen: set[str] = set()
+    for group in payload.values() if isinstance(payload, dict) else []:
+        for entry in group.get("items", []) if isinstance(group, dict) else []:
+            app_id = str(entry.get("id") or "")
+            discount = int(entry.get("discount_percent") or 0)
+            if not app_id or app_id in seen or discount <= 0:
+                continue
+            seen.add(app_id)
+            final_price = entry.get("final_price")
+            original_price = entry.get("original_price")
+            price = f"¥{final_price / 100:.2f}" if isinstance(final_price, (int, float)) else "特惠"
+            original = f"，原价 ¥{original_price / 100:.2f}" if isinstance(original_price, (int, float)) else ""
+            items.append(
+                {
+                    "id": f"{config['id']}-{app_id}",
+                    "source_id": config["id"],
+                    "source": config["name"],
+                    "tone": config["tone"],
+                    "section": config["section"],
+                    "category": "游戏",
+                    "title": entry.get("name") or "Steam 特惠",
+                    "summary": f"折扣 {discount}% · {price}{original}",
+                    "url": entry.get("url") or f"https://store.steampowered.com/app/{app_id}",
+                    "published_at": datetime.now(timezone.utc).isoformat(),
+                    "heat": discount,
+                    "metrics": {"折扣%": discount},
+                    "image_url": entry.get("header_image") or "",
+                }
+            )
+            if len(items) >= 20:
+                return items
+    return items
+
+
+def parse_nba(raw: bytes, config: dict) -> list[dict]:
+    payload = json.loads(raw.decode("utf-8"))
+    games = payload.get("scoreboard", {}).get("games", [])
+    items: list[dict] = []
+    for game in games:
+        home = game.get("homeTeam", {})
+        away = game.get("awayTeam", {})
+        status = game.get("gameStatusText") or game.get("gameStatus", "")
+        home_score = home.get("score", "-")
+        away_score = away.get("score", "-")
+        home_name = home.get("teamTricode") or home.get("teamName") or "主队"
+        away_name = away.get("teamTricode") or away.get("teamName") or "客队"
+        game_id = game.get("gameId") or f"{away_name}-{home_name}"
+        items.append(
+            {
+                "id": f"{config['id']}-{game_id}",
+                "source_id": config["id"],
+                "source": config["name"],
+                "tone": config["tone"],
+                "section": config["section"],
+                "category": "竞技",
+                "title": f"{away_name} {away_score} : {home_score} {home_name}",
+                "summary": status or "今日赛程",
+                "url": "https://www.nba.com/games",
+                "published_at": parse_date(game.get("gameTimeUTC") or game.get("gameEt")),
+                "heat": 0,
+                "metrics": {},
             }
         )
     return items
@@ -243,7 +584,8 @@ def build_payload(force: bool = False) -> dict:
         disk_cache = load_disk_cache()
         all_items: list[dict] = []
         statuses: list[dict] = []
-        updated_cache = {"sources": {}}
+        # Start from the last good cache so a temporary outage cannot erase it.
+        updated_cache = {"sources": dict(disk_cache.get("sources", {}))}
 
         for config in SOURCE_CONFIG:
             source_id = config["id"]
@@ -251,7 +593,7 @@ def build_payload(force: bool = False) -> dict:
                 if config["kind"] == "rss":
                     raw = fetch_bytes(config["url"], "application/rss+xml, application/xml, text/xml;q=0.9")
                     items = parse_rss(raw, config)
-                else:
+                elif config["kind"] == "zhihu":
                     params = {
                         "include": "data[*].title,url,created,updated,excerpt,voteup_count,comment_count,image_url",
                         "limit": "20",
@@ -259,6 +601,17 @@ def build_payload(force: bool = False) -> dict:
                     }
                     raw = fetch_bytes(f"{config['url']}?{urlencode(params)}", "application/json, text/plain;q=0.9")
                     items = parse_zhihu(raw, config)
+                elif config["kind"] == "tencent":
+                    raw = fetch_bytes(config["url"], "text/plain, */*;q=0.9")
+                    items = parse_tencent(raw, config)
+                elif config["kind"] == "steam":
+                    raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
+                    items = parse_steam(raw, config)
+                elif config["kind"] == "nba":
+                    raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
+                    items = parse_nba(raw, config)
+                else:
+                    items = []
                 items = items[:30]
                 updated_cache["sources"][source_id] = {"items": items, "saved_at": now}
                 statuses.append({"id": source_id, "name": config["short_name"], "state": "live", "count": len(items)})
@@ -283,7 +636,14 @@ def build_payload(force: bool = False) -> dict:
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "statuses": statuses,
             "sources": [
-                {"id": c["id"], "name": c["name"], "description": c["description"], "url": c["url"]}
+                {
+                    "id": c["id"],
+                    "name": c["name"],
+                    "short_name": c["short_name"],
+                    "section": c["section"],
+                    "description": c["description"],
+                    "url": c["url"],
+                }
                 for c in SOURCE_CONFIG
             ],
         }

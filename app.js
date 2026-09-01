@@ -1,5 +1,6 @@
 const state = {
   items: [],
+  section: "ai",
   source: "all",
   query: "",
   sort: "time",
@@ -48,6 +49,7 @@ function updateDate() {
 function renderCards() {
   const query = state.query.trim().toLowerCase();
   const filtered = state.items
+    .filter((item) => (item.section || "ai") === state.section)
     .filter((item) => state.source === "all" || item.source_id === state.source)
     .filter((item) => !query || `${item.title} ${item.summary} ${item.source}`.toLowerCase().includes(query))
     .sort((a, b) => state.sort === "heat"
@@ -84,16 +86,37 @@ function renderCards() {
 }
 
 function renderCounts() {
+  const sectionItems = state.items.filter((item) => (item.section || "ai") === state.section);
+  const counts = sectionItems.reduce((acc, item) => {
+    acc[item.source_id] = (acc[item.source_id] || 0) + 1;
+    return acc;
+  }, {});
+  $("#all-count").textContent = sectionItems.length;
+  $$('[data-count-for]').forEach((node) => {
+    node.textContent = counts[node.dataset.countFor] || 0;
+  });
+  $("#total-count").textContent = sectionItems.length;
+  $("#progress-fill").style.width = `${Math.min(100, sectionItems.length / 30 * 100)}%`;
+}
+
+function bindSourceEvents() {
+  $$(".source-filter").forEach((button) => button.addEventListener("click", () => {
+    state.source = button.dataset.source;
+    $$(".source-filter").forEach((node) => node.classList.toggle("is-active", node === button));
+    renderCards();
+  }));
+}
+
+function renderSourceFilters() {
+  const container = $("#source-filters");
+  const sources = (state.payload?.sources || []).filter((source) => source.section === state.section);
   const counts = state.items.reduce((acc, item) => {
     acc[item.source_id] = (acc[item.source_id] || 0) + 1;
     return acc;
   }, {});
-  $("#all-count").textContent = state.items.length;
-  $$('[data-count-for]').forEach((node) => {
-    node.textContent = counts[node.dataset.countFor] || 0;
-  });
-  $("#total-count").textContent = state.items.length;
-  $("#progress-fill").style.width = `${Math.min(100, state.items.length / 30 * 100)}%`;
+  container.innerHTML = `<button class="source-filter is-active" type="button" data-source="all">全部 <span id="all-count">${state.items.filter((item) => (item.section || "ai") === state.section).length}</span></button>`
+    + sources.map((source) => `<button class="source-filter" type="button" data-source="${escapeHtml(source.id)}">${escapeHtml(source.short_name || source.name)} <span data-count-for="${escapeHtml(source.id)}">${counts[source.id] || 0}</span></button>`).join("");
+  bindSourceEvents();
 }
 
 function renderStatuses(statuses = []) {
@@ -127,6 +150,7 @@ async function loadData(force = false) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     state.payload = await response.json();
     state.items = state.payload.items || [];
+    renderSourceFilters();
     renderCounts();
     renderCards();
     renderStatuses(state.payload.statuses);
@@ -166,16 +190,22 @@ const placeholderContent = {
 
 function selectSection(section) {
   $$(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.section === section));
-  const isAI = section === "ai";
-  $("#ai-section").hidden = !isAI;
-  $("#placeholder-section").hidden = isAI;
-  if (!isAI) {
-    const content = placeholderContent[section];
-    $("#placeholder-eyebrow").textContent = content.eyebrow;
-    $("#placeholder-title").textContent = content.title;
-    $("#placeholder-copy").textContent = content.copy;
-    $("#planned-sources").innerHTML = content.sources.map((source) => `<span class="planned-source">${escapeHtml(source)}</span>`).join("");
-  }
+  state.section = section;
+  state.source = "all";
+  $("#feed-section").hidden = false;
+  $("#placeholder-section").hidden = true;
+  const headings = {
+    ai: ["CURATED FEED", "AI 信号"],
+    market: ["LIVE SNAPSHOT", "市场数据"],
+    games: ["DEALS & PATCHES", "游戏情报"],
+    sports: ["SCORES & FIXTURES", "竞技赛果"],
+  };
+  const [eyebrow, title] = headings[section] || headings.ai;
+  $("#section-eyebrow").textContent = eyebrow;
+  $("#section-title").textContent = title;
+  renderSourceFilters();
+  renderCounts();
+  renderCards();
 }
 
 function bindEvents() {
@@ -188,11 +218,6 @@ function bindEvents() {
     state.sort = event.target.value;
     renderCards();
   });
-  $$(".source-filter").forEach((button) => button.addEventListener("click", () => {
-    state.source = button.dataset.source;
-    $$(".source-filter").forEach((node) => node.classList.toggle("is-active", node === button));
-    renderCards();
-  }));
   $$(".tab").forEach((tab) => tab.addEventListener("click", () => selectSection(tab.dataset.section)));
 }
 
