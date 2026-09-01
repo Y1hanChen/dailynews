@@ -25,6 +25,15 @@ python3 server.py
 python3 server.py --host 0.0.0.0 --port 8787
 ```
 
+如果当前机器访问外网需要工作区提供的代理，先执行：
+
+```bash
+source ../proxy.sh
+python3 server.py
+```
+
+页面右上角和“数据源状态”会区分 `实时`、`缓存` 和 `示例`。看到 `示例` 时表示本次外站请求失败，并不代表数据源没有内容。
+
 ## 目录
 
 | 文件 | 作用 |
