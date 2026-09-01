@@ -4,8 +4,8 @@
 
 - Thinking Machines Lab：官方研究博客与公告 RSS
 - 机器之心、量子位、新智元：知乎专栏接口
-- 腾讯行情：主要指数和 COMEX 黄金快照
-- Steam：当前特惠列表
+- 腾讯行情：主要指数和 COMEX 黄金快照，以区域行情地图展示
+- Steam：当前特惠列表，以折扣榜展示
 - NBA：今日赛程和比分
 
 市场、游戏和竞技栏目已经预留界面，后续按同一套数据源适配器接入。
@@ -68,7 +68,7 @@ https://www.zhihu.com/api/v4/columns/jiqizhixin/articles
 
 ```text
 量子位: qbitai
-新智元: newzhiyuan
+新智元: newzhiyuan（服务端会顺序探测 `xinzhiyuan`、`newzyuan`、`newzy`、`newai`、`aiera`）
 ```
 
 这两个 slug 在首次刷新时会由来源状态显示为“实时”“缓存”或“示例”。如果某个专栏改过 URL，只需修改 `SOURCE_CONFIG` 对应的 `slug` 和 `url`，页面不需要改动。
@@ -76,8 +76,9 @@ https://www.zhihu.com/api/v4/columns/jiqizhixin/articles
 ### 其他栏目
 
 - 市场使用腾讯行情的公开报价接口，适合个人低频快照，不是交易级行情。
-- Steam 使用商店特惠接口，只提供当前折扣；历史最低价需要另接价格历史服务。
+- Steam 使用商店特惠接口，只提供当前折扣；历史最低价需要另接价格历史服务。页面用价格榜而不是资讯卡片展示。
 - NBA 使用官方 CDN 赛果 JSON。赛季休赛期或接口风控时会显示缓存/示例。
+- 云顶之弈目前接入 Riot Data Dragon 的公开版本号接口。拳头中文新闻页会跳转腾讯站，未发现稳定的公开 TFT 新闻 API；详细版本说明暂链接到官方新闻页，社区数据可在后续单独接入。
 
 ## 接口
 

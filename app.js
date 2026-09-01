@@ -62,6 +62,16 @@ function renderCards() {
     return;
   }
 
+  if (state.section === "market") {
+    renderMarketMap(filtered);
+    return;
+  }
+
+  if (state.section === "games") {
+    renderSteamDeals(filtered);
+    return;
+  }
+
   grid.innerHTML = filtered.map((item) => {
     const metrics = Object.entries(item.metrics || {})
       .filter(([, value]) => Number(value) > 0)
@@ -83,6 +93,91 @@ function renderCards() {
         </div>
       </article>`;
   }).join("");
+}
+
+const marketPositions = [
+  { match: "上证", icon: "中", className: "mainland" },
+  { match: "深证", icon: "深", className: "mainland south" },
+  { match: "恒生", icon: "港", className: "hong-kong" },
+  { match: "标普", icon: "美", className: "united-states" },
+  { match: "纳斯达克", icon: "纳", className: "united-states west" },
+  { match: "黄金", icon: "金", className: "gold" },
+];
+
+function marketMeta(item) {
+  const match = marketPositions.find((position) => item.title.includes(position.match));
+  const pct = Number(item.metrics?.["涨跌%"] || 0);
+  const direction = pct > 0 ? "up" : pct < 0 ? "down" : "flat";
+  const titleParts = item.title.split(" · ");
+  return {
+    icon: match?.icon || "·",
+    className: match?.className || "other",
+    name: titleParts[0] || item.title,
+    value: titleParts[1] || "--",
+    pct,
+    direction,
+  };
+}
+
+function renderMarketMap(items) {
+  const grid = $("#feed-grid");
+  const rows = items.map((item) => {
+    const meta = marketMeta(item);
+    const sign = meta.pct > 0 ? "+" : "";
+    return `<div class="market-row">
+      <span class="market-row-name"><i class="market-row-icon ${meta.direction}">${escapeHtml(meta.icon)}</i>${escapeHtml(meta.name)}</span>
+      <strong>${escapeHtml(meta.value)}</strong>
+      <span class="market-change ${meta.direction}">${sign}${meta.pct.toFixed(2)}%</span>
+    </div>`;
+  }).join("");
+  const nodes = items.map((item) => {
+    const meta = marketMeta(item);
+    const sign = meta.pct > 0 ? "+" : "";
+    return `<a class="market-node ${meta.className} ${meta.direction}" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer">
+      <span class="market-node-icon">${escapeHtml(meta.icon)}</span>
+      <span class="market-node-copy"><b>${escapeHtml(meta.name)}</b><strong>${escapeHtml(meta.value)}</strong><em>${sign}${meta.pct.toFixed(2)}%</em></span>
+    </a>`;
+  }).join("");
+  grid.innerHTML = `<div class="market-map">
+    <div class="market-canvas" aria-label="全球市场行情地图">
+      <span class="map-caption">GLOBAL SESSION / ${escapeHtml(formatDate(items[0]?.published_at || ""))}</span>
+      <span class="map-line line-one" aria-hidden="true"></span><span class="map-line line-two" aria-hidden="true"></span>
+      ${nodes}
+    </div>
+    <div class="market-readout">
+      <div class="readout-head"><span>MARKET PULSE</span><span>${items.length} 个品种</span></div>
+      ${rows}
+      <p class="readout-note">红色代表上涨，绿色代表下跌。数据为个人看板快照，不构成交易依据。</p>
+    </div>
+  </div>`;
+}
+
+function renderSteamDeals(items) {
+  const grid = $("#feed-grid");
+  const rows = items.map((item) => {
+    const discount = Number(item.discount_percent || item.metrics?.["折扣%"] || 0);
+    const finalPrice = Number(item.final_price);
+    const originalPrice = Number(item.original_price);
+    const hasPrice = Number.isFinite(finalPrice);
+    const price = hasPrice ? `¥${(finalPrice / 100).toFixed(2)}` : "查看特惠";
+    const original = Number.isFinite(originalPrice) && originalPrice > finalPrice ? `¥${(originalPrice / 100).toFixed(2)}` : "";
+    const url = safeUrl(item.url);
+    const image = item.image_url
+      ? `<img src="${escapeHtml(safeUrl(item.image_url))}" alt="" loading="lazy" />`
+      : `<span class="steam-thumb-fallback">S</span>`;
+    return `<article class="steam-row">
+      <a class="steam-thumb" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${image}</a>
+      <div class="steam-copy"><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(item.title)}</a><span>${escapeHtml(item.summary || "Steam 商店当前特惠")}</span></div>
+      <div class="steam-discount ${discount > 0 ? "has-discount" : ""}">${discount > 0 ? `-${discount}%` : "特惠"}</div>
+      <div class="steam-price"><strong>${escapeHtml(price)}</strong>${original ? `<del>${escapeHtml(original)}</del>` : ""}</div>
+      <a class="steam-open" href="${escapeHtml(url)}" target="_blank" rel="noreferrer" aria-label="打开 ${escapeHtml(item.title)}">↗</a>
+    </article>`;
+  }).join("");
+  grid.innerHTML = `<div class="steam-deals">
+    <div class="steam-deals-head"><span>STEAM DEALS</span><span>当前商店价格</span></div>
+    ${rows}
+    <p class="steam-note">折扣来自 Steam 商店当前价格；历史最低价需要接入价格历史服务后再标注。</p>
+  </div>`;
 }
 
 function renderCounts() {

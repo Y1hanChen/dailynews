@@ -64,6 +64,7 @@ SOURCE_CONFIG = [
         "kind": "zhihu",
         "section": "ai",
         "slug": "newzhiyuan",
+        "slugs": ["newzhiyuan", "xinzhiyuan", "newzyuan", "newzy", "newai", "aiera"],
         "url": "https://www.zhihu.com/api/v4/columns/newzhiyuan/articles",
         "tone": "coral",
         "description": "新智元中文 AI 资讯与解读",
@@ -87,6 +88,16 @@ SOURCE_CONFIG = [
         "url": "https://store.steampowered.com/api/featuredcategories?cc=CN&l=schinese",
         "tone": "blue",
         "description": "当前特惠价格与折扣",
+    },
+    {
+        "id": "tft-riot-version",
+        "name": "拳头 · 云顶之弈",
+        "short_name": "云顶之弈",
+        "kind": "riot_version",
+        "section": "games",
+        "url": "https://ddragon.leagueoflegends.com/api/versions.json",
+        "tone": "teal",
+        "description": "Riot Data Dragon 公开版本号",
     },
     {
         "id": "nba-scoreboard",
@@ -256,6 +267,23 @@ SAMPLE_ITEMS = {
             "title": "NBA 今日赛果",
             "summary": "连接 NBA 赛果接口后显示今日赛程、比分和比赛状态。",
             "url": "https://www.nba.com/games",
+            "published_at": "2026-09-01T00:00:00+00:00",
+            "heat": 0,
+            "metrics": {},
+            "sample": True,
+        },
+    ],
+    "tft-riot-version": [
+        {
+            "id": "sample-tft-version",
+            "source_id": "tft-riot-version",
+            "source": "拳头 · 云顶之弈",
+            "tone": "teal",
+            "section": "games",
+            "category": "游戏",
+            "title": "云顶之弈 · 版本信息",
+            "summary": "Riot 官方版本接口连接后显示当前公开版本号；版本说明仍需从官方新闻页补充。",
+            "url": "https://teamfighttactics.leagueoflegends.com/zh-cn/news/",
             "published_at": "2026-09-01T00:00:00+00:00",
             "heat": 0,
             "metrics": {},
@@ -511,12 +539,39 @@ def parse_steam(raw: bytes, config: dict) -> list[dict]:
                     "published_at": datetime.now(timezone.utc).isoformat(),
                     "heat": discount,
                     "metrics": {"折扣%": discount},
+                    "discount_percent": discount,
+                    "final_price": final_price,
+                    "original_price": original_price,
                     "image_url": entry.get("header_image") or "",
                 }
             )
             if len(items) >= 20:
                 return items
     return items
+
+
+def parse_riot_version(raw: bytes, config: dict) -> list[dict]:
+    versions = json.loads(raw.decode("utf-8"))
+    if not isinstance(versions, list) or not versions:
+        raise ValueError("Riot version response is empty")
+    version = str(versions[0])
+    return [
+        {
+            "id": f"{config['id']}-{version}",
+            "source_id": config["id"],
+            "source": config["name"],
+            "tone": config["tone"],
+            "section": config["section"],
+            "category": "游戏",
+            "title": f"云顶之弈 · {version}",
+            "summary": "Riot Data Dragon 当前公开版本号。中文版本说明暂从官方新闻页查看。",
+            "url": "https://teamfighttactics.leagueoflegends.com/zh-cn/news/",
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "heat": 0,
+            "metrics": {},
+            "version": version,
+        }
+    ]
 
 
 def parse_nba(raw: bytes, config: dict) -> list[dict]:
@@ -599,8 +654,24 @@ def build_payload(force: bool = False) -> dict:
                         "limit": "20",
                         "offset": "0",
                     }
-                    raw = fetch_bytes(f"{config['url']}?{urlencode(params)}", "application/json, text/plain;q=0.9")
-                    items = parse_zhihu(raw, config)
+                    slugs = config.get("slugs") or [config.get("slug", "")]
+                    items = []
+                    candidate_errors: list[str] = []
+                    for slug in slugs:
+                        if not slug:
+                            continue
+                        candidate_url = f"https://www.zhihu.com/api/v4/columns/{slug}/articles?{urlencode(params)}"
+                        try:
+                            raw = fetch_bytes(candidate_url, "application/json, text/plain;q=0.9")
+                            candidate_items = parse_zhihu(raw, config)
+                            if candidate_items:
+                                items = candidate_items
+                                break
+                            candidate_errors.append(f"{slug}: empty")
+                        except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError) as candidate_exc:
+                            candidate_errors.append(f"{slug}: {candidate_exc}")
+                    if not items:
+                        raise ValueError("; ".join(candidate_errors)[:500] or "no Zhihu column candidates")
                 elif config["kind"] == "tencent":
                     raw = fetch_bytes(config["url"], "text/plain, */*;q=0.9")
                     items = parse_tencent(raw, config)
@@ -610,6 +681,9 @@ def build_payload(force: bool = False) -> dict:
                 elif config["kind"] == "nba":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_nba(raw, config)
+                elif config["kind"] == "riot_version":
+                    raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
+                    items = parse_riot_version(raw, config)
                 else:
                     items = []
                 items = items[:30]
