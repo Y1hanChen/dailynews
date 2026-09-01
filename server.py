@@ -80,11 +80,31 @@ SOURCE_CONFIG = [
         "description": "主要指数与黄金快照",
     },
     {
+        "id": "market-sectors",
+        "name": "东方财富 · 板块",
+        "short_name": "板块涨跌",
+        "kind": "eastmoney",
+        "section": "market",
+        "url": "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f3&fs=m:90+t:2&fields=f12,f14,f2,f3,f4,f104,f105,f106",
+        "tone": "yellow",
+        "description": "行业板块领涨领跌与家数",
+    },
+    {
+        "id": "finance-news",
+        "name": "金融资讯",
+        "short_name": "资讯流",
+        "kind": "sample",
+        "section": "market",
+        "url": "https://xueqiu.com/",
+        "tone": "coral",
+        "description": "雪球、知乎、东方财富、财新入口",
+    },
+    {
         "id": "steam-specials",
         "name": "Steam 特惠",
         "short_name": "Steam",
         "kind": "steam",
-        "section": "games",
+        "section": "steam",
         "url": "https://store.steampowered.com/api/featuredcategories?cc=CN&l=schinese",
         "tone": "blue",
         "description": "当前特惠价格与折扣",
@@ -94,7 +114,7 @@ SOURCE_CONFIG = [
         "name": "拳头 · 云顶之弈",
         "short_name": "云顶之弈",
         "kind": "riot_version",
-        "section": "games",
+        "section": "tft",
         "url": "https://ddragon.leagueoflegends.com/api/versions.json",
         "tone": "teal",
         "description": "Riot Data Dragon 公开版本号",
@@ -239,13 +259,141 @@ SAMPLE_ITEMS = {
             "sample": True,
         },
     ],
+    "market-sectors": [
+        {
+            "id": "sample-sector-up-1",
+            "source_id": "market-sectors",
+            "source": "东方财富 · 板块",
+            "tone": "yellow",
+            "section": "market",
+            "category": "板块",
+            "sector_side": "up",
+            "title": "半导体 · +2.18%",
+            "summary": "离线示例：恢复行情连接后显示领涨板块和上涨家数。",
+            "url": "https://quote.eastmoney.com/center/boardlist.html#industry_board",
+            "published_at": "2026-09-01T08:05:00+00:00",
+            "heat": 2.18,
+            "metrics": {"涨跌%": 2.18},
+            "sample": True,
+        },
+        {
+            "id": "sample-sector-up-2",
+            "source_id": "market-sectors",
+            "source": "东方财富 · 板块",
+            "tone": "yellow",
+            "section": "market",
+            "category": "板块",
+            "sector_side": "up",
+            "title": "软件开发 · +1.42%",
+            "summary": "离线示例：恢复行情连接后显示板块资金和个股数量。",
+            "url": "https://quote.eastmoney.com/center/boardlist.html#industry_board",
+            "published_at": "2026-09-01T08:04:00+00:00",
+            "heat": 1.42,
+            "metrics": {"涨跌%": 1.42},
+            "sample": True,
+        },
+        {
+            "id": "sample-sector-down-1",
+            "source_id": "market-sectors",
+            "source": "东方财富 · 板块",
+            "tone": "yellow",
+            "section": "market",
+            "category": "板块",
+            "sector_side": "down",
+            "title": "房地产 · -1.76%",
+            "summary": "离线示例：恢复行情连接后显示领跌板块和下跌家数。",
+            "url": "https://quote.eastmoney.com/center/boardlist.html#industry_board",
+            "published_at": "2026-09-01T08:03:00+00:00",
+            "heat": 1.76,
+            "metrics": {"涨跌%": -1.76},
+            "sample": True,
+        },
+        {
+            "id": "sample-sector-down-2",
+            "source_id": "market-sectors",
+            "source": "东方财富 · 板块",
+            "tone": "yellow",
+            "section": "market",
+            "category": "板块",
+            "sector_side": "down",
+            "title": "医药商业 · -1.08%",
+            "summary": "离线示例：恢复行情连接后显示板块分化。",
+            "url": "https://quote.eastmoney.com/center/boardlist.html#industry_board",
+            "published_at": "2026-09-01T08:02:00+00:00",
+            "heat": 1.08,
+            "metrics": {"涨跌%": -1.08},
+            "sample": True,
+        },
+    ],
+    "finance-news": [
+        {
+            "id": "sample-finance-xueqiu",
+            "source_id": "finance-news",
+            "source": "金融 · 雪球",
+            "tone": "coral",
+            "section": "market",
+            "category": "金融",
+            "title": "央行降准释放流动性，权益市场迎来新变化",
+            "summary": "市场对于后续货币政策的预期持续发酵，债券、股票板块出现明显分化，机构观点出现分歧。",
+            "url": "https://xueqiu.com/",
+            "published_at": "2026-09-01T06:51:00+00:00",
+            "heat": 7,
+            "metrics": {"热点": 7, "深度": 20},
+            "sample": True,
+        },
+        {
+            "id": "sample-finance-zhihu",
+            "source_id": "finance-news",
+            "source": "金融 · 知乎",
+            "tone": "teal",
+            "section": "market",
+            "category": "金融",
+            "title": "个人投资者如何应对高波动市场环境",
+            "summary": "震荡行情下，择时难度显著加大，普通散户配置思路应当转向均衡分散，降低单一赛道押注风险。",
+            "url": "https://www.zhihu.com/search?type=content&q=%E9%87%91%E8%9E%8D",
+            "published_at": "2026-09-01T04:01:00+00:00",
+            "heat": 21,
+            "metrics": {"赞": 21},
+            "sample": True,
+        },
+        {
+            "id": "sample-finance-eastmoney",
+            "source_id": "finance-news",
+            "source": "金融 · 东方财富",
+            "tone": "yellow",
+            "section": "market",
+            "category": "金融",
+            "title": "AI 大模型如何重塑券商投研工作流？风险与机遇并存",
+            "summary": "智能投研工具快速普及，从财报解析到舆情抓取，AI 深度介入投研全流程，但数据幻觉问题仍然是行业隐患。",
+            "url": "https://finance.eastmoney.com/",
+            "published_at": "2026-09-01T06:48:00+00:00",
+            "heat": 8,
+            "metrics": {"赞": 8},
+            "sample": True,
+        },
+        {
+            "id": "sample-finance-caixin",
+            "source_id": "finance-news",
+            "source": "金融 · 财新",
+            "tone": "blue",
+            "section": "market",
+            "category": "金融",
+            "title": "公募基金费率改革后续影响推演",
+            "summary": "费率下行倒逼基金公司转向管理能力竞争，小基金生存压力加大，行业加速洗牌。",
+            "url": "https://www.caixin.com/",
+            "published_at": "2026-09-01T04:00:00+00:00",
+            "heat": 5,
+            "metrics": {"赞": 5},
+            "sample": True,
+        },
+    ],
     "steam-specials": [
         {
             "id": "sample-steam-specials",
             "source_id": "steam-specials",
             "source": "Steam 特惠",
             "tone": "blue",
-            "section": "games",
+            "section": "steam",
             "category": "游戏",
             "title": "Steam 今日特惠",
             "summary": "连接 Steam 商店后显示当前折扣和价格；历史最低价需要额外的价格历史服务。",
@@ -279,7 +427,7 @@ SAMPLE_ITEMS = {
             "source_id": "tft-riot-version",
             "source": "拳头 · 云顶之弈",
             "tone": "teal",
-            "section": "games",
+            "section": "tft",
             "category": "游戏",
             "title": "云顶之弈 · 版本信息",
             "summary": "Riot 官方版本接口连接后显示当前公开版本号；版本说明仍需从官方新闻页补充。",
@@ -510,6 +658,45 @@ def parse_tencent(raw: bytes, config: dict) -> list[dict]:
     return items
 
 
+def parse_eastmoney(raw: bytes, config: dict) -> list[dict]:
+    payload = json.loads(raw.decode("utf-8"))
+    rows = payload.get("data", {}).get("diff", []) if isinstance(payload, dict) else []
+    if isinstance(rows, dict):
+        rows = list(rows.values())
+    items: list[dict] = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("f14") or row.get("name") or "板块")
+        try:
+            pct = float(row.get("f3"))
+        except (TypeError, ValueError):
+            continue
+        up_count = int(row.get("f104") or 0)
+        down_count = int(row.get("f105") or 0)
+        flat_count = int(row.get("f106") or 0)
+        code = str(row.get("f12") or name)
+        side = "up" if pct >= 0 else "down"
+        items.append(
+            {
+                "id": f"{config['id']}-{code}",
+                "source_id": config["id"],
+                "source": config["name"],
+                "tone": config["tone"],
+                "section": config["section"],
+                "category": "板块",
+                "sector_side": side,
+                "title": f"{name} · {pct:+.2f}%",
+                "summary": f"上涨 {up_count} · 下跌 {down_count} · 平盘 {flat_count}",
+                "url": "https://quote.eastmoney.com/center/boardlist.html#industry_board",
+                "published_at": datetime.now(timezone.utc).isoformat(),
+                "heat": abs(pct),
+                "metrics": {"涨跌%": round(pct, 2), "上涨家数": up_count, "下跌家数": down_count},
+            }
+        )
+    return sorted(items, key=lambda item: item["heat"], reverse=True)[:30]
+
+
 def parse_steam(raw: bytes, config: dict) -> list[dict]:
     payload = json.loads(raw.decode("utf-8"))
     items: list[dict] = []
@@ -675,6 +862,9 @@ def build_payload(force: bool = False) -> dict:
                 elif config["kind"] == "tencent":
                     raw = fetch_bytes(config["url"], "text/plain, */*;q=0.9")
                     items = parse_tencent(raw, config)
+                elif config["kind"] == "eastmoney":
+                    raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
+                    items = parse_eastmoney(raw, config)
                 elif config["kind"] == "steam":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_steam(raw, config)
@@ -684,6 +874,8 @@ def build_payload(force: bool = False) -> dict:
                 elif config["kind"] == "riot_version":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_riot_version(raw, config)
+                elif config["kind"] == "sample":
+                    raise ValueError("sample-only source")
                 else:
                     items = []
                 items = items[:30]

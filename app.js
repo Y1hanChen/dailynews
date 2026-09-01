@@ -7,6 +7,9 @@ const state = {
   payload: null,
 };
 
+let worldFeatures = null;
+let worldMapPromise = null;
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
@@ -67,8 +70,13 @@ function renderCards() {
     return;
   }
 
-  if (state.section === "games") {
+  if (state.section === "steam") {
     renderSteamDeals(filtered);
+    return;
+  }
+
+  if (state.section === "tft") {
+    renderTftPanel(filtered);
     return;
   }
 
@@ -119,9 +127,80 @@ function marketMeta(item) {
   };
 }
 
+function pctFor(items, matcher) {
+  const values = items.filter((item) => matcher(item)).map((item) => Number(item.metrics?.["涨跌%"] || 0));
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function directionFor(pct) {
+  return pct > 0 ? "up" : pct < 0 ? "down" : "flat";
+}
+
+function projectMapPoint(lon, lat) {
+  return [((lon + 180) / 360) * 960, ((90 - lat) / 180) * 430];
+}
+
+function ringPath(ring) {
+  return ring.map(([lon, lat], index) => {
+    const [x, y] = projectMapPoint(lon, lat);
+    return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(" ") + " Z";
+}
+
+function geometryPath(geometry) {
+  if (!geometry) return "";
+  if (geometry.type === "Polygon") return geometry.coordinates.map(ringPath).join(" ");
+  if (geometry.type === "MultiPolygon") return geometry.coordinates.flat().map(ringPath).join(" ");
+  return "";
+}
+
+function renderWorldSvg(indexItems) {
+  if (!worldFeatures) {
+    return `<div class="map-loading"><span class="spinner" aria-hidden="true"></span><span>正在加载世界边界</span></div>`;
+  }
+  const chinaPct = pctFor(indexItems, (item) => item.title.includes("上证") || item.title.includes("深证"));
+  const hkPct = pctFor(indexItems, (item) => item.title.includes("恒生"));
+  const usPct = pctFor(indexItems, (item) => item.title.includes("标普") || item.title.includes("纳斯达克"));
+  const signals = { CN: chinaPct, HK: hkPct, US: usPct };
+  const paths = worldFeatures.map((feature) => {
+    const code = feature.properties?.["ISO3166-1-Alpha-2"] || "";
+    const name = feature.properties?.name || "";
+    const pct = signals[code];
+    const signalClass = Object.prototype.hasOwnProperty.call(signals, code) ? directionFor(pct) : "neutral";
+    return `<path class="country ${signalClass}" d="${geometryPath(feature.geometry)}"><title>${escapeHtml(name)}${Object.prototype.hasOwnProperty.call(signals, code) ? ` · ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%` : ""}</title></path>`;
+  }).join("");
+  const labels = [
+    [105, 35, "中", directionFor(chinaPct)],
+    [114, 22, "港", directionFor(hkPct)],
+    [-100, 39, "美", directionFor(usPct)],
+    [34, 14, "金", "gold"],
+  ].map(([lon, lat, label, tone]) => {
+    const [x, y] = projectMapPoint(lon, lat);
+    return `<g class="map-label ${tone}" transform="translate(${x.toFixed(2)} ${y.toFixed(2)})"><circle r="12"></circle><text y="4">${label}</text></g>`;
+  }).join("");
+  return `<svg class="world-map" viewBox="0 0 960 430" role="img" aria-label="全球国家轮廓和市场涨跌"><g class="country-layer">${paths}</g><g class="map-label-layer">${labels}</g></svg><div class="map-legend"><span><i class="legend-dot up"></i>上涨</span><span><i class="legend-dot down"></i>下跌</span><span><i class="legend-dot neutral"></i>无报价</span></div>`;
+}
+
+function ensureWorldMap() {
+  if (worldFeatures || worldMapPromise) return;
+  worldMapPromise = fetch("/assets/world.geojson", { cache: "force-cache" })
+    .then((response) => {
+      if (!response.ok) throw new Error(`World map HTTP ${response.status}`);
+      return response.json();
+    })
+    .then((geojson) => {
+      worldFeatures = geojson.features || [];
+      renderCards();
+    })
+    .catch((error) => console.warn("World map unavailable", error));
+}
+
 function renderMarketMap(items) {
   const grid = $("#feed-grid");
-  const rows = items.map((item) => {
+  const indexItems = items.filter((item) => item.category === "市场");
+  const sectorItems = items.filter((item) => item.category === "板块");
+  const newsItems = items.filter((item) => item.category === "金融");
+  const rows = indexItems.map((item) => {
     const meta = marketMeta(item);
     const sign = meta.pct > 0 ? "+" : "";
     return `<div class="market-row">
@@ -130,26 +209,47 @@ function renderMarketMap(items) {
       <span class="market-change ${meta.direction}">${sign}${meta.pct.toFixed(2)}%</span>
     </div>`;
   }).join("");
-  const nodes = items.map((item) => {
-    const meta = marketMeta(item);
-    const sign = meta.pct > 0 ? "+" : "";
-    return `<a class="market-node ${meta.className} ${meta.direction}" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer">
-      <span class="market-node-icon">${escapeHtml(meta.icon)}</span>
-      <span class="market-node-copy"><b>${escapeHtml(meta.name)}</b><strong>${escapeHtml(meta.value)}</strong><em>${sign}${meta.pct.toFixed(2)}%</em></span>
-    </a>`;
-  }).join("");
   grid.innerHTML = `<div class="market-map">
     <div class="market-canvas" aria-label="全球市场行情地图">
-      <span class="map-caption">GLOBAL SESSION / ${escapeHtml(formatDate(items[0]?.published_at || ""))}</span>
-      <span class="map-line line-one" aria-hidden="true"></span><span class="map-line line-two" aria-hidden="true"></span>
-      ${nodes}
+      <span class="map-caption">GLOBAL SESSION / ${escapeHtml(formatDate(indexItems[0]?.published_at || ""))}</span>
+      ${renderWorldSvg(indexItems)}
     </div>
     <div class="market-readout">
-      <div class="readout-head"><span>MARKET PULSE</span><span>${items.length} 个品种</span></div>
+      <div class="readout-head"><span>MARKET PULSE</span><span>${indexItems.length} 个品种</span></div>
       ${rows}
       <p class="readout-note">红色代表上涨，绿色代表下跌。数据为个人看板快照，不构成交易依据。</p>
     </div>
-  </div>`;
+  </div>${renderSectorBoard(sectorItems)}${renderFinanceNews(newsItems)}`;
+  ensureWorldMap();
+}
+
+function sectorRow(item) {
+  const pct = Number(item.metrics?.["涨跌%"] || 0);
+  const sign = pct > 0 ? "+" : "";
+  const width = Math.min(100, Math.abs(pct) * 16 + 12);
+  return `<a class="sector-row" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><span class="sector-name">${escapeHtml(item.title.split(" · ")[0])}</span><span class="sector-bar"><i class="${pct >= 0 ? "up" : "down"}" style="width:${width}%"></i></span><strong class="${pct >= 0 ? "up" : "down"}">${sign}${pct.toFixed(2)}%</strong></a>`;
+}
+
+function renderSectorBoard(items) {
+  const sorted = [...items].sort((a, b) => Number(b.metrics?.["涨跌%"] || 0) - Number(a.metrics?.["涨跌%"] || 0));
+  const rising = sorted.filter((item) => Number(item.metrics?.["涨跌%"] || 0) >= 0).slice(0, 5);
+  const falling = sorted.filter((item) => Number(item.metrics?.["涨跌%"] || 0) < 0).sort((a, b) => Number(a.metrics?.["涨跌%"] || 0) - Number(b.metrics?.["涨跌%"] || 0)).slice(0, 5);
+  return `<section class="sector-board">
+    <div class="sector-board-head"><span>SECTOR BREADTH</span><span>板块涨跌</span></div>
+    <div class="sector-columns">
+      <div class="sector-column"><div class="sector-column-title"><span class="sector-signal up"></span>领涨</div>${rising.length ? rising.map(sectorRow).join("") : `<p class="sector-empty">暂无领涨数据</p>`}</div>
+      <div class="sector-column"><div class="sector-column-title"><span class="sector-signal down"></span>领跌</div>${falling.length ? falling.map(sectorRow).join("") : `<p class="sector-empty">暂无领跌数据</p>`}</div>
+    </div>
+  </section>`;
+}
+
+function renderFinanceNews(items) {
+  if (!items.length) return "";
+  const rows = [...items].sort((a, b) => b.published_at.localeCompare(a.published_at)).map((item) => {
+    const metrics = Object.entries(item.metrics || {}).map(([label, value]) => `<span>${escapeHtml(label)} <strong>${Number(value).toLocaleString("zh-CN")}</strong></span>`).join("");
+    return `<article class="finance-news-row"><div class="finance-news-meta"><span class="source-dot ${escapeHtml(item.tone)}"></span><span>${escapeHtml(item.source)}</span><time>${escapeHtml(formatDate(item.published_at))}</time></div><a class="finance-news-title" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer">${escapeHtml(item.title)}</a><p>${escapeHtml(item.summary)}</p><div class="finance-news-bottom"><span class="metrics">${metrics || "金融"}</span>${item.sample ? `<span class="sample-note">示例缓存</span>` : ""}<a href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer">打开 <span aria-hidden="true">↗</span></a></div></article>`;
+  }).join("");
+  return `<section class="finance-news"><div class="finance-news-head"><span>FINANCE SIGNALS</span><span>资讯流</span></div><div class="finance-news-grid">${rows}</div></section>`;
 }
 
 function renderSteamDeals(items) {
@@ -177,6 +277,34 @@ function renderSteamDeals(items) {
     <div class="steam-deals-head"><span>STEAM DEALS</span><span>当前商店价格</span></div>
     ${rows}
     <p class="steam-note">折扣来自 Steam 商店当前价格；历史最低价需要接入价格历史服务后再标注。</p>
+  </div>`;
+}
+
+function renderTftPanel(items) {
+  const grid = $("#feed-grid");
+  const versionItem = items.find((item) => item.version || item.title.includes("云顶之弈"));
+  const version = versionItem?.version || versionItem?.title.split(" · ")[1] || "待同步";
+  const versionUrl = safeUrl(versionItem?.url || "https://teamfighttactics.leagueoflegends.com/zh-cn/news/");
+  grid.innerHTML = `<div class="tft-panel">
+    <div class="tft-hero">
+      <div><p class="tft-kicker">TEAMFIGHT TACTICS / LIVE PATCH</p><h3>版本 ${escapeHtml(version)}</h3><p>把版本变化和高胜率解法放在同一块，快速找今天的上分信息。</p></div>
+      <a class="tft-patch-link" href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">官方公告 <span aria-hidden="true">↗</span></a>
+    </div>
+    <div class="tft-links">
+      <a class="tft-link datatft" href="https://www.datatft.com/" target="_blank" rel="noreferrer">
+        <span class="tft-link-icon">D</span><span><b>DataTFT</b><small>阵容、英雄、装备与强化符文数据</small></span><span class="tft-arrow" aria-hidden="true">↗</span>
+      </a>
+      <a class="tft-link tftable" href="https://tftable.com/" target="_blank" rel="noreferrer">
+        <span class="tft-link-icon">T</span><span><b>TFTable</b><small>环境、阵容强度与版本参考</small></span><span class="tft-arrow" aria-hidden="true">↗</span>
+      </a>
+    </div>
+    <div class="tft-checks">
+      <div class="tft-check-head"><span>INFORMATION EDGE</span><span>今日检查清单</span></div>
+      <div class="tft-check"><span><i>01</i>版本变化</span><a href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">Riot 官方新闻 <span aria-hidden="true">↗</span></a></div>
+      <div class="tft-check"><span><i>02</i>阵容强度</span><a href="https://www.datatft.com/" target="_blank" rel="noreferrer">DataTFT <span aria-hidden="true">↗</span></a></div>
+      <div class="tft-check"><span><i>03</i>环境差异</span><a href="https://tftable.com/" target="_blank" rel="noreferrer">TFTable <span aria-hidden="true">↗</span></a></div>
+    </div>
+    <p class="tft-note">官方版本号来自 Riot Data Dragon；第三方站点暂以直达入口为主，后续再接公开数据接口。</p>
   </div>`;
 }
 
@@ -269,11 +397,17 @@ const placeholderContent = {
     copy: "沪深、港股、美股、黄金与板块行情将在这里汇总。",
     sources: ["指数与板块", "黄金现货", "自选列表"],
   },
-  games: {
-    eyebrow: "NEXT MODULE / GAMES",
-    title: "游戏情报",
-    copy: "云顶之弈版本动态与 Steam 折扣历史会集中在这里。",
-    sources: ["云顶之弈", "Steam 折扣", "史低提醒"],
+  steam: {
+    eyebrow: "DEALS & PRICES / STEAM",
+    title: "Steam 折扣",
+    copy: "当前特惠和价格变化集中在这里。",
+    sources: ["当前折扣", "价格榜", "史低待接入"],
+  },
+  tft: {
+    eyebrow: "PATCH & META / TFT",
+    title: "云顶之弈",
+    copy: "版本变化、阵容强度和环境差异集中在这里。",
+    sources: ["Riot 版本", "DataTFT", "TFTable"],
   },
   sports: {
     eyebrow: "NEXT MODULE / COMPETITION",
@@ -291,8 +425,9 @@ function selectSection(section) {
   $("#placeholder-section").hidden = true;
   const headings = {
     ai: ["CURATED FEED", "AI 信号"],
-    market: ["LIVE SNAPSHOT", "市场数据"],
-    games: ["DEALS & PATCHES", "游戏情报"],
+    market: ["LIVE SNAPSHOT / FINANCE", "金融市场"],
+    steam: ["DEALS & PRICES", "Steam 折扣"],
+    tft: ["PATCH & META", "云顶之弈"],
     sports: ["SCORES & FIXTURES", "竞技赛果"],
   };
   const [eyebrow, title] = headings[section] || headings.ai;
