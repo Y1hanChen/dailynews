@@ -101,6 +101,13 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .source-filter:hover { border-color: var(--line-strong); color: var(--ink); }
 .source-filter.is-active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 .source-filter.is-active span { color: #cbc8c0; }
+.market-scope-filters { display: flex; width: fit-content; max-width: 100%; margin: -7px 0 21px; overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 4px; scrollbar-width: none; }
+.market-scope-filters[hidden] { display: none; }
+.market-scope-filters::-webkit-scrollbar { display: none; }
+.market-scope-filter { flex: 0 0 auto; border: 0; border-right: 1px solid var(--line); padding: 7px 13px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; }
+.market-scope-filter:last-child { border-right: 0; }
+.market-scope-filter:hover { color: var(--ink); background: rgba(251, 250, 247, .65); }
+.market-scope-filter.is-active { background: var(--ink); color: var(--paper); }
 
 .feed-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .market-map { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .8fr); gap: 12px; grid-column: 1 / -1; }

@@ -78,6 +78,7 @@ SOURCE_CONFIG = [
         "url": "https://qt.gtimg.cn/q=sh000001,sz399001,hkHSI,usINX,usIXIC,hf_GC",
         "tone": "yellow",
         "description": "主要指数与黄金快照",
+        "market_scope": "all",
     },
     {
         "id": "market-sectors",
@@ -88,6 +89,7 @@ SOURCE_CONFIG = [
         "url": "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f3&fs=m:90+t:2&fields=f12,f14,f2,f3,f4,f104,f105,f106",
         "tone": "yellow",
         "description": "行业板块领涨领跌与家数",
+        "market_scope": "cn",
     },
     {
         "id": "finance-news",
@@ -113,11 +115,12 @@ SOURCE_CONFIG = [
         "id": "tft-riot-version",
         "name": "拳头 · 云顶之弈",
         "short_name": "云顶之弈",
-        "kind": "riot_version",
+        "kind": "tft_live_patch",
         "section": "tft",
-        "url": "https://ddragon.leagueoflegends.com/api/versions.json",
+        "url": "https://raw.communitydragon.org/cdragon/tft/en_us.json",
+        "version_fallback_url": "https://raw.communitydragon.org/api/v1/versions",
         "tone": "teal",
-        "description": "Riot Data Dragon 公开版本号",
+        "description": "CommunityDragon TFT live 数据版本号",
     },
     {
         "id": "nba-scoreboard",
@@ -220,6 +223,7 @@ SAMPLE_ITEMS = {
             "tone": "yellow",
             "section": "market",
             "category": "市场",
+            "market_scope": "cn",
             "title": "上证指数 · 3,979.89",
             "summary": "最近一次可用快照：-0.16%。实时行情连接后会自动更新。",
             "url": "https://quote.eastmoney.com/center/gridlist.html#hs_a_board",
@@ -235,6 +239,7 @@ SAMPLE_ITEMS = {
             "tone": "yellow",
             "section": "market",
             "category": "市场",
+            "market_scope": "gold",
             "title": "COMEX 黄金 · 4,459.70",
             "summary": "黄金期货报价示例。个人看板接入后可继续扩展自选品种。",
             "url": "https://quote.eastmoney.com/center/gridlist.html#futures",
@@ -250,6 +255,7 @@ SAMPLE_ITEMS = {
             "tone": "yellow",
             "section": "market",
             "category": "市场",
+            "market_scope": "hk",
             "title": "恒生指数 · 25,336.75",
             "summary": "最近一次可用快照：-0.90%。数据源恢复后显示实时变动。",
             "url": "https://quote.eastmoney.com/center/gridlist.html#hk_market",
@@ -267,6 +273,7 @@ SAMPLE_ITEMS = {
             "tone": "yellow",
             "section": "market",
             "category": "板块",
+            "market_scope": "cn",
             "sector_side": "up",
             "title": "半导体 · +2.18%",
             "summary": "离线示例：恢复行情连接后显示领涨板块和上涨家数。",
@@ -283,6 +290,7 @@ SAMPLE_ITEMS = {
             "tone": "yellow",
             "section": "market",
             "category": "板块",
+            "market_scope": "cn",
             "sector_side": "up",
             "title": "软件开发 · +1.42%",
             "summary": "离线示例：恢复行情连接后显示板块资金和个股数量。",
@@ -299,6 +307,7 @@ SAMPLE_ITEMS = {
             "tone": "yellow",
             "section": "market",
             "category": "板块",
+            "market_scope": "cn",
             "sector_side": "down",
             "title": "房地产 · -1.76%",
             "summary": "离线示例：恢复行情连接后显示领跌板块和下跌家数。",
@@ -315,6 +324,7 @@ SAMPLE_ITEMS = {
             "tone": "yellow",
             "section": "market",
             "category": "板块",
+            "market_scope": "cn",
             "sector_side": "down",
             "title": "医药商业 · -1.08%",
             "summary": "离线示例：恢复行情连接后显示板块分化。",
@@ -429,12 +439,14 @@ SAMPLE_ITEMS = {
             "tone": "teal",
             "section": "tft",
             "category": "游戏",
-            "title": "云顶之弈 · 版本信息",
-            "summary": "Riot 官方版本接口连接后显示当前公开版本号；版本说明仍需从官方新闻页补充。",
-            "url": "https://teamfighttactics.leagueoflegends.com/zh-cn/news/",
+            "title": "云顶之弈 · 16.17.1",
+            "summary": "离线示例：CommunityDragon TFT live 数据连接后显示当前版本；公告按主版本号定位。",
+            "url": "https://teamfighttactics.leagueoflegends.com/zh-cn/news/game-updates/teamfight-tactics-patch-16-17-notes/",
             "published_at": "2026-09-01T00:00:00+00:00",
             "heat": 0,
             "metrics": {},
+            "version": "16.17.1",
+            "version_source": "离线示例缓存",
             "sample": True,
         },
     ],
@@ -647,6 +659,7 @@ def parse_tencent(raw: bytes, config: dict) -> list[dict]:
                 "tone": config["tone"],
                 "section": config["section"],
                 "category": "市场",
+                "market_scope": "cn" if code.startswith(("sh", "sz")) else "hk" if code.startswith("hk") else "us" if code.startswith("us") else "gold" if code.startswith("hf_") else "other",
                 "title": f"{name} · {current:,.2f}",
                 "summary": f"最新变动 {change:+.2f}，涨跌幅 {change_pct:+.2f}%",
                 "url": "https://quote.eastmoney.com/center/gridlist.html#hs_a_board",
@@ -685,6 +698,7 @@ def parse_eastmoney(raw: bytes, config: dict) -> list[dict]:
                 "tone": config["tone"],
                 "section": config["section"],
                 "category": "板块",
+                "market_scope": config.get("market_scope", "cn"),
                 "sector_side": side,
                 "title": f"{name} · {pct:+.2f}%",
                 "summary": f"上涨 {up_count} · 下跌 {down_count} · 平盘 {flat_count}",
@@ -737,11 +751,32 @@ def parse_steam(raw: bytes, config: dict) -> list[dict]:
     return items
 
 
-def parse_riot_version(raw: bytes, config: dict) -> list[dict]:
-    versions = json.loads(raw.decode("utf-8"))
-    if not isinstance(versions, list) or not versions:
-        raise ValueError("Riot version response is empty")
-    version = str(versions[0])
+def parse_tft_live_patch(raw: bytes, config: dict) -> list[dict]:
+    """Read the live TFT data version, rather than the League client version list."""
+    payload = json.loads(raw.decode("utf-8"))
+    if isinstance(payload, list):
+        candidates = [str(payload[0])] if payload else []
+    elif isinstance(payload, dict):
+        version_list = payload.get("versions") or payload.get("data")
+        candidates = [str(version_list[0])] if isinstance(version_list, list) and version_list else []
+    else:
+        raise ValueError("CommunityDragon TFT response has an unsupported shape")
+
+    for container in (payload, payload.get("metadata"), payload.get("versionInfo")) if isinstance(payload, dict) else ():
+        if not isinstance(container, dict):
+            continue
+        for key in ("version", "gameVersion", "patchVersion", "patch"):
+            value = container.get(key)
+            if value is not None:
+                candidates.append(str(value))
+    version = next(
+        (match.group(0) for value in candidates for match in [re.search(r"\d+\.\d+(?:\.\d+)?", value)] if match),
+        None,
+    )
+    if not version:
+        raise ValueError("CommunityDragon TFT version is missing")
+    major_minor = ".".join(version.split(".")[:2])
+    patch_url = f"https://teamfighttactics.leagueoflegends.com/zh-cn/news/game-updates/teamfight-tactics-patch-{major_minor.replace('.', '-')}-notes/"
     return [
         {
             "id": f"{config['id']}-{version}",
@@ -751,12 +786,14 @@ def parse_riot_version(raw: bytes, config: dict) -> list[dict]:
             "section": config["section"],
             "category": "游戏",
             "title": f"云顶之弈 · {version}",
-            "summary": "Riot Data Dragon 当前公开版本号。中文版本说明暂从官方新闻页查看。",
-            "url": "https://teamfighttactics.leagueoflegends.com/zh-cn/news/",
+            "summary": f"CommunityDragon TFT live 数据版本。官方公告通常按 {major_minor} 主版本命名，小版本后缀可能不同。",
+            "url": patch_url,
             "published_at": datetime.now(timezone.utc).isoformat(),
             "heat": 0,
             "metrics": {},
             "version": version,
+            "patch_url": patch_url,
+            "version_source": "CommunityDragon TFT live",
         }
     ]
 
@@ -863,22 +900,48 @@ def build_payload(force: bool = False) -> dict:
                     raw = fetch_bytes(config["url"], "text/plain, */*;q=0.9")
                     items = parse_tencent(raw, config)
                 elif config["kind"] == "eastmoney":
-                    raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
-                    items = parse_eastmoney(raw, config)
+                    # Eastmoney's `po` parameter controls sort direction. Fetch both
+                    # ends so a strong bull day cannot hide the losing sectors.
+                    urls = [config["url"], re.sub(r"([?&])po=1(?:&|$)", r"\1po=0&", config["url"], count=1)]
+                    merged: dict[str, dict] = {}
+                    sector_errors: list[Exception] = []
+                    for sector_url in dict.fromkeys(urls):
+                        try:
+                            raw = fetch_bytes(sector_url, "application/json, text/plain;q=0.9")
+                            for item in parse_eastmoney(raw, config):
+                                key = item["id"]
+                                existing = merged.get(key)
+                                if existing is None or abs(item["metrics"].get("涨跌%", 0)) > abs(existing["metrics"].get("涨跌%", 0)):
+                                    merged[key] = item
+                        except (HTTPError, URLError, TimeoutError, OSError, ET.ParseError, json.JSONDecodeError, UnicodeError, ValueError) as sector_exc:
+                            sector_errors.append(sector_exc)
+                    if not merged and sector_errors:
+                        raise sector_errors[0]
+                    items = sorted(merged.values(), key=lambda item: item["metrics"].get("涨跌%", 0), reverse=True)
                 elif config["kind"] == "steam":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_steam(raw, config)
                 elif config["kind"] == "nba":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_nba(raw, config)
-                elif config["kind"] == "riot_version":
+                elif config["kind"] == "tft_live_patch":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
-                    items = parse_riot_version(raw, config)
+                    try:
+                        items = parse_tft_live_patch(raw, config)
+                    except ValueError:
+                        fallback_url = config.get("version_fallback_url")
+                        if not fallback_url:
+                            raise
+                        fallback_raw = fetch_bytes(fallback_url, "application/json, text/plain;q=0.9")
+                        items = parse_tft_live_patch(fallback_raw, config)
+                        for item in items:
+                            item["version_source"] = "CommunityDragon patch index（回退）"
+                            item["summary"] = "CommunityDragon 版本索引回退值。官方公告通常按主版本命名，小版本后缀可能不同。"
                 elif config["kind"] == "sample":
                     raise ValueError("sample-only source")
                 else:
                     items = []
-                items = items[:30]
+                items = items[:60] if config["kind"] == "eastmoney" else items[:30]
                 updated_cache["sources"][source_id] = {"items": items, "saved_at": now}
                 statuses.append({"id": source_id, "name": config["short_name"], "state": "live", "count": len(items)})
             except (HTTPError, URLError, TimeoutError, OSError, ET.ParseError, json.JSONDecodeError, UnicodeError, ValueError) as exc:

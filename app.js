@@ -2,6 +2,7 @@ const state = {
   items: [],
   section: "ai",
   source: "all",
+  marketScope: "all",
   query: "",
   sort: "time",
   payload: null,
@@ -112,6 +113,32 @@ const marketPositions = [
   { match: "黄金", icon: "金", className: "gold" },
 ];
 
+const marketScopeLabels = {
+  all: "全部市场",
+  cn: "A股",
+  hk: "港股",
+  us: "美股",
+  gold: "黄金",
+};
+
+function marketItemScope(item) {
+  if (item.market_scope) return item.market_scope;
+  if (item.category === "板块") return "cn";
+  const title = item.title || "";
+  if (title.includes("上证") || title.includes("深证")) return "cn";
+  if (title.includes("恒生")) return "hk";
+  if (title.includes("标普") || title.includes("纳斯达克")) return "us";
+  if (title.includes("黄金")) return "gold";
+  return "other";
+}
+
+function officialTftPatchUrl(version) {
+  const match = String(version || "").match(/\d+\.\d+(?:\.\d+)?/);
+  if (!match) return "https://teamfighttactics.leagueoflegends.com/zh-cn/news/game-updates/";
+  const majorMinor = match[0].split(".").slice(0, 2).join("-");
+  return `https://teamfighttactics.leagueoflegends.com/zh-cn/news/game-updates/teamfight-tactics-patch-${majorMinor}-notes/`;
+}
+
 function marketMeta(item) {
   const match = marketPositions.find((position) => item.title.includes(position.match));
   const pct = Number(item.metrics?.["涨跌%"] || 0);
@@ -197,8 +224,10 @@ function ensureWorldMap() {
 
 function renderMarketMap(items) {
   const grid = $("#feed-grid");
-  const indexItems = items.filter((item) => item.category === "市场");
-  const sectorItems = items.filter((item) => item.category === "板块");
+  const scope = state.marketScope;
+  const scopeLabel = marketScopeLabels[scope] || marketScopeLabels.all;
+  const indexItems = items.filter((item) => item.category === "市场" && (scope === "all" || marketItemScope(item) === scope));
+  const sectorItems = items.filter((item) => item.category === "板块" && (scope === "all" || marketItemScope(item) === scope));
   const newsItems = items.filter((item) => item.category === "金融");
   const rows = indexItems.map((item) => {
     const meta = marketMeta(item);
@@ -215,8 +244,9 @@ function renderMarketMap(items) {
       ${renderWorldSvg(indexItems)}
     </div>
     <div class="market-readout">
-      <div class="readout-head"><span>MARKET PULSE</span><span>${indexItems.length} 个品种</span></div>
+      <div class="readout-head"><span>MARKET PULSE / ${escapeHtml(scopeLabel)}</span><span>${indexItems.length} 个品种</span></div>
       ${rows}
+      ${indexItems.length ? "" : `<p class="sector-empty">暂无该市场指数快照</p>`}
       <p class="readout-note">红色代表上涨，绿色代表下跌。数据为个人看板快照，不构成交易依据。</p>
     </div>
   </div>${renderSectorBoard(sectorItems)}${renderFinanceNews(newsItems)}`;
@@ -234,11 +264,13 @@ function renderSectorBoard(items) {
   const sorted = [...items].sort((a, b) => Number(b.metrics?.["涨跌%"] || 0) - Number(a.metrics?.["涨跌%"] || 0));
   const rising = sorted.filter((item) => Number(item.metrics?.["涨跌%"] || 0) >= 0).slice(0, 5);
   const falling = sorted.filter((item) => Number(item.metrics?.["涨跌%"] || 0) < 0).sort((a, b) => Number(a.metrics?.["涨跌%"] || 0) - Number(b.metrics?.["涨跌%"] || 0)).slice(0, 5);
+  const scopeLabel = marketScopeLabels[state.marketScope] || marketScopeLabels.all;
+  const emptyLabel = state.marketScope === "all" || state.marketScope === "cn" ? "暂无板块数据" : "该市场暂未接入板块接口";
   return `<section class="sector-board">
-    <div class="sector-board-head"><span>SECTOR BREADTH</span><span>板块涨跌</span></div>
+    <div class="sector-board-head"><span>SECTOR BREADTH / ${escapeHtml(scopeLabel)}</span><span>板块涨跌</span></div>
     <div class="sector-columns">
-      <div class="sector-column"><div class="sector-column-title"><span class="sector-signal up"></span>领涨</div>${rising.length ? rising.map(sectorRow).join("") : `<p class="sector-empty">暂无领涨数据</p>`}</div>
-      <div class="sector-column"><div class="sector-column-title"><span class="sector-signal down"></span>领跌</div>${falling.length ? falling.map(sectorRow).join("") : `<p class="sector-empty">暂无领跌数据</p>`}</div>
+      <div class="sector-column"><div class="sector-column-title"><span class="sector-signal up"></span>领涨</div>${rising.length ? rising.map(sectorRow).join("") : `<p class="sector-empty">${emptyLabel}</p>`}</div>
+      <div class="sector-column"><div class="sector-column-title"><span class="sector-signal down"></span>领跌</div>${falling.length ? falling.map(sectorRow).join("") : `<p class="sector-empty">${emptyLabel}</p>`}</div>
     </div>
   </section>`;
 }
@@ -284,11 +316,12 @@ function renderTftPanel(items) {
   const grid = $("#feed-grid");
   const versionItem = items.find((item) => item.version || item.title.includes("云顶之弈"));
   const version = versionItem?.version || versionItem?.title.split(" · ")[1] || "待同步";
-  const versionUrl = safeUrl(versionItem?.url || "https://teamfighttactics.leagueoflegends.com/zh-cn/news/");
+  const versionUrl = safeUrl(versionItem?.patch_url || (versionItem?.version ? officialTftPatchUrl(version) : versionItem?.url || officialTftPatchUrl(version)));
+  const versionSource = versionItem?.version_source || "待连接 Riot 数据";
   grid.innerHTML = `<div class="tft-panel">
     <div class="tft-hero">
-      <div><p class="tft-kicker">TEAMFIGHT TACTICS / LIVE PATCH</p><h3>版本 ${escapeHtml(version)}</h3><p>把版本变化和高胜率解法放在同一块，快速找今天的上分信息。</p></div>
-      <a class="tft-patch-link" href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">官方公告 <span aria-hidden="true">↗</span></a>
+      <div><p class="tft-kicker">TEAMFIGHT TACTICS / LIVE PATCH</p><h3>版本 ${escapeHtml(version)}</h3><p>当前版本：${escapeHtml(versionSource)}。公告可能按主版本号命名，小版本后缀不代表数据错误。</p></div>
+      <a class="tft-patch-link" href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">对应补丁公告 <span aria-hidden="true">↗</span></a>
     </div>
     <div class="tft-links">
       <a class="tft-link datatft" href="https://www.datatft.com/" target="_blank" rel="noreferrer">
@@ -300,11 +333,11 @@ function renderTftPanel(items) {
     </div>
     <div class="tft-checks">
       <div class="tft-check-head"><span>INFORMATION EDGE</span><span>今日检查清单</span></div>
-      <div class="tft-check"><span><i>01</i>版本变化</span><a href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">Riot 官方新闻 <span aria-hidden="true">↗</span></a></div>
+      <div class="tft-check"><span><i>01</i>版本变化</span><a href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">对应补丁公告 <span aria-hidden="true">↗</span></a></div>
       <div class="tft-check"><span><i>02</i>阵容强度</span><a href="https://www.datatft.com/" target="_blank" rel="noreferrer">DataTFT <span aria-hidden="true">↗</span></a></div>
       <div class="tft-check"><span><i>03</i>环境差异</span><a href="https://tftable.com/" target="_blank" rel="noreferrer">TFTable <span aria-hidden="true">↗</span></a></div>
     </div>
-    <p class="tft-note">官方版本号来自 Riot Data Dragon；第三方站点暂以直达入口为主，后续再接公开数据接口。</p>
+    <p class="tft-note">版本号来自 CommunityDragon 的 TFT live 数据，不再把英雄联盟 Data Dragon 版本列表当作云顶版本。公告链接按当前主版本 ${escapeHtml(version.split(".").slice(0, 2).join("."))} 定位。</p>
   </div>`;
 }
 
@@ -330,6 +363,14 @@ function bindSourceEvents() {
   }));
 }
 
+function bindMarketScopeEvents() {
+  $$(".market-scope-filter").forEach((button) => button.addEventListener("click", () => {
+    state.marketScope = button.dataset.marketScope;
+    $$(".market-scope-filter").forEach((node) => node.classList.toggle("is-active", node === button));
+    renderCards();
+  }));
+}
+
 function renderSourceFilters() {
   const container = $("#source-filters");
   const sources = (state.payload?.sources || []).filter((source) => source.section === state.section);
@@ -340,6 +381,14 @@ function renderSourceFilters() {
   container.innerHTML = `<button class="source-filter is-active" type="button" data-source="all">全部 <span id="all-count">${state.items.filter((item) => (item.section || "ai") === state.section).length}</span></button>`
     + sources.map((source) => `<button class="source-filter" type="button" data-source="${escapeHtml(source.id)}">${escapeHtml(source.short_name || source.name)} <span data-count-for="${escapeHtml(source.id)}">${counts[source.id] || 0}</span></button>`).join("");
   bindSourceEvents();
+  const marketFilters = $("#market-scope-filters");
+  marketFilters.hidden = state.section !== "market";
+  if (state.section === "market") {
+    marketFilters.innerHTML = Object.entries(marketScopeLabels).map(([scope, label]) => `<button class="market-scope-filter${state.marketScope === scope ? " is-active" : ""}" type="button" data-market-scope="${scope}">${label}</button>`).join("");
+    bindMarketScopeEvents();
+  } else {
+    marketFilters.innerHTML = "";
+  }
 }
 
 function renderStatuses(statuses = []) {
@@ -421,6 +470,7 @@ function selectSection(section) {
   $$(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.section === section));
   state.section = section;
   state.source = "all";
+  state.marketScope = "all";
   $("#feed-section").hidden = false;
   $("#placeholder-section").hidden = true;
   const headings = {
