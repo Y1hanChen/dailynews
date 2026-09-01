@@ -46,6 +46,7 @@ python3 server.py
 | `app.js` | 筛选、排序、栏目切换和刷新交互 |
 | `.cache.json` | 运行时生成的本地缓存，不提交 Git |
 | `assets/world.geojson` | 本地国家边界，用于金融行情地图 |
+| `THIRD_PARTY_NOTICES.md` | 地图边界数据来源和许可证说明 |
 
 ## 数据源
 
@@ -163,6 +164,18 @@ git push -u origin main
 ```
 
 不要提交 `.cache.json`，也不要把任何平台 Cookie、Token 或个人数据写入仓库。
+
+## 部署到 dochub.gxtree.com
+
+本项目需要运行 Python 服务端来代理外部数据源，不能只作为纯静态页面发布。部署平台需要将仓库的 Web 进程指向：
+
+```text
+python3 server.py --host 0.0.0.0 --port $PORT
+```
+
+仓库已提供 `Procfile` 和 `Dockerfile`。将 `dochub.gxtree.com` 的 DNS/HTTPS 反向代理指向该服务的端口即可。域名解析、证书和平台登录权限不在代码仓库内，需在部署平台配置。
+
+如果平台只支持静态托管，页面仍能打开，但 `/api/dashboard` 无法抓取数据；应改用支持 Python Web 进程的部署方式。
 
 ## 维护约定
 
