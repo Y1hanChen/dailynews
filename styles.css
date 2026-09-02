@@ -219,6 +219,30 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .steam-open { color: var(--muted); font-size: 17px; text-decoration: none; }
 .steam-open:hover { color: var(--ink); }
 .steam-note { padding: 0 20px 16px; }
+.entertainment-board { display: grid; grid-column: 1 / -1; gap: 12px; }
+.entertainment-feature, .entertainment-list-section { border-top: 2px solid var(--ink); background: var(--card); }
+.entertainment-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 20px 13px; background: var(--paper-deep); color: var(--ink); font-size: 13px; font-weight: 700; }
+.entertainment-head a { color: var(--muted); font-size: 11px; font-weight: 500; text-decoration: none; }
+.entertainment-head a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.entertainment-anime-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 20px 20px; }
+.entertainment-anime-card { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; min-width: 0; padding: 8px; border: 1px solid var(--line); background: var(--paper-deep); border-radius: 4px; text-decoration: none; }
+.entertainment-anime-card:hover { border-color: var(--line-strong); }
+.entertainment-poster { position: relative; width: 72px; height: 96px; overflow: hidden; background: #d9d6cc; }
+.entertainment-poster img { width: 100%; height: 100%; object-fit: cover; }
+.entertainment-poster > i { position: absolute; right: 4px; bottom: 4px; padding: 1px 4px; background: rgba(31, 33, 31, .8); color: var(--paper); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-style: normal; }
+.entertainment-poster-fallback { display: grid; width: 100%; height: 100%; place-items: center; color: var(--muted); font-size: 25px; font-weight: 700; }
+.entertainment-copy { display: grid; align-content: start; min-width: 0; gap: 4px; }
+.entertainment-copy strong { display: -webkit-box; overflow: hidden; color: var(--ink); font-size: 12px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.entertainment-copy span { color: var(--coral); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
+.entertainment-copy small { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.entertainment-link-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 66px; padding: 10px 20px; border-bottom: 1px solid var(--line); text-decoration: none; }
+.entertainment-link-row:hover { background: var(--paper-deep); }
+.entertainment-link-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--teal); font-size: 12px; font-weight: 700; }
+.entertainment-link-row > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+.entertainment-link-row strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.entertainment-link-row small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.entertainment-link-row b { color: var(--faint); font-size: 10px; font-weight: 500; }
+.entertainment-empty { margin: 0; padding: 18px 20px 22px; color: var(--muted); font-size: 12px; }
 .tft-panel { grid-column: 1 / -1; border-top: 2px solid var(--ink); background: var(--card); }
 .tft-hero { display: flex; align-items: end; justify-content: space-between; gap: 24px; min-height: 170px; padding: 25px 27px 24px; background: #e8e6dd; }
 .tft-kicker { margin: 0 0 10px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; letter-spacing: .1em; }
@@ -250,6 +274,14 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .tft-data-empty { margin: 11px 0 0; color: var(--faint); font-size: 11px; }
 .tft-composition, .tft-rankings { margin: 0 14px; padding: 16px 13px 15px; border-top: 1px solid var(--line); }
 .tft-unit-list, .tft-lineup-list { display: grid; gap: 0; margin-top: 10px; }
+.tft-unit-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.tft-unit-card { display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 68px; padding: 8px; border: 1px solid var(--line); background: var(--paper-deep); border-radius: 4px; }
+.tft-unit-avatar { position: relative; display: grid; flex: 0 0 auto; width: 43px; height: 43px; place-items: center; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 50%; background: #d9d6cc; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; font-weight: 700; }
+.tft-unit-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tft-unit-copy { display: grid; min-width: 0; gap: 2px; }
+.tft-unit-copy strong { overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.tft-unit-copy span { color: var(--faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
+.tft-unit-copy small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .tft-unit-row { display: grid; grid-template-columns: minmax(112px, .8fr) 42px minmax(0, 1.5fr); align-items: baseline; gap: 8px; min-height: 31px; border-bottom: 1px solid rgba(31, 33, 31, .1); color: var(--muted); font-size: 11px; }
 .tft-unit-row strong { overflow: hidden; color: var(--ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .tft-unit-row span { color: var(--faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
@@ -361,12 +393,19 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
   .steam-row { grid-template-columns: 58px minmax(0, 1fr) 53px 69px 18px; gap: 8px; padding: 9px 12px; }
   .steam-thumb { width: 58px; height: 38px; }
   .steam-copy span { font-size: 10px; }
+  .entertainment-anime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 11px; }
+  .entertainment-head { padding-right: 13px; padding-left: 13px; }
+  .entertainment-link-row { padding-right: 13px; padding-left: 13px; }
   .tft-hero { align-items: flex-start; flex-direction: column; gap: 18px; padding: 22px 20px; }
   .tft-hero h3 { font-size: 26px; }
   .tft-links { grid-template-columns: 1fr; padding: 11px 11px 0; }
   .tft-data { margin: 15px 11px 0; }
   .tft-stats { grid-template-columns: repeat(2, 1fr); }
   .tft-composition, .tft-rankings { margin-right: 11px; margin-left: 11px; }
+  .tft-unit-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .tft-unit-card { gap: 7px; min-height: 62px; padding: 7px; }
+  .tft-unit-avatar { width: 36px; height: 36px; font-size: 14px; }
+  .tft-unit-copy strong { font-size: 11px; }
   .tft-unit-row { grid-template-columns: minmax(85px, .8fr) 34px minmax(0, 1.5fr); gap: 5px; }
   .tft-lineup-row { grid-template-columns: 85px minmax(0, 1fr); gap: 6px; }
   .tft-checks { margin: 15px 11px 0; }

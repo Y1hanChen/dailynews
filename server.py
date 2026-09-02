@@ -148,6 +148,36 @@ SOURCE_CONFIG = [
         "tone": "coral",
         "description": "今日赛程与比赛结果",
     },
+    {
+        "id": "bangumi-anime",
+        "name": "Bangumi · 番剧",
+        "short_name": "Bangumi 番剧",
+        "kind": "bangumi",
+        "section": "entertainment",
+        "url": "https://api.bgm.tv/v0/subjects?type=2&sort=rank&limit=20",
+        "tone": "coral",
+        "description": "番剧评分与排名（Bangumi API）",
+    },
+    {
+        "id": "hongguo-short-drama",
+        "name": "红果短剧 · 热榜",
+        "short_name": "红果短剧",
+        "kind": "sample",
+        "section": "entertainment",
+        "url": "https://www.hongguoduanju.com/",
+        "tone": "yellow",
+        "description": "红果短剧热榜（暂未发现稳定公开接口）",
+    },
+    {
+        "id": "novel-rankings",
+        "name": "小说榜单 · 起点",
+        "short_name": "小说榜单",
+        "kind": "sample",
+        "section": "entertainment",
+        "url": "https://www.qidian.com/rank/",
+        "tone": "teal",
+        "description": "网络小说榜单入口（暂用公开页面）",
+    },
 ]
 
 SAMPLE_ITEMS = {
@@ -448,6 +478,42 @@ SAMPLE_ITEMS = {
             "sample": True,
         },
     ],
+    "hongguo-short-drama": [
+        {
+            "id": "sample-hongguo-short-drama",
+            "source_id": "hongguo-short-drama",
+            "source": "红果短剧 · 热榜",
+            "tone": "yellow",
+            "section": "entertainment",
+            "category": "文娱",
+            "entertainment_kind": "short-drama",
+            "title": "红果短剧热榜",
+            "summary": "红果暂未提供稳定的公开榜单接口，点击来源可查看官方内容。",
+            "url": "https://www.hongguoduanju.com/",
+            "published_at": "2026-09-01T08:00:00+00:00",
+            "heat": 0,
+            "metrics": {},
+            "sample": True,
+        },
+    ],
+    "novel-rankings": [
+        {
+            "id": "sample-novel-rankings",
+            "source_id": "novel-rankings",
+            "source": "小说榜单 · 起点",
+            "tone": "teal",
+            "section": "entertainment",
+            "category": "文娱",
+            "entertainment_kind": "novel",
+            "title": "起点中文网小说榜单",
+            "summary": "当前先提供公开榜单入口；站内排名接口需要后续适配和低频缓存。",
+            "url": "https://www.qidian.com/rank/",
+            "published_at": "2026-09-01T08:00:00+00:00",
+            "heat": 0,
+            "metrics": {},
+            "sample": True,
+        },
+    ],
     "tft-riot-version": [
         {
             "id": "sample-tft-version",
@@ -540,7 +606,11 @@ def parse_date(value: str | int | float | None) -> str:
         if isinstance(value, (int, float)):
             dt = datetime.fromtimestamp(value, tz=timezone.utc)
         else:
-            dt = parsedate_to_datetime(str(value))
+            text_value = str(value).strip()
+            try:
+                dt = datetime.fromisoformat(text_value.replace("Z", "+00:00"))
+            except ValueError:
+                dt = parsedate_to_datetime(text_value)
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
             dt = dt.astimezone(timezone.utc)
@@ -619,6 +689,49 @@ def parse_zhihu(raw: bytes, config: dict) -> list[dict]:
                 "heat": voteups + comments * 2,
                 "metrics": {"赞": voteups, "评": comments},
                 "image_url": entry.get("image_url") or "",
+            }
+        )
+    return items
+
+
+def parse_bangumi(raw: bytes, config: dict) -> list[dict]:
+    payload = json.loads(raw.decode("utf-8"))
+    entries = payload.get("data", []) if isinstance(payload, dict) else []
+    items: list[dict] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        rating = entry.get("rating") if isinstance(entry.get("rating"), dict) else {}
+        try:
+            score = float(rating.get("score") or 0)
+        except (TypeError, ValueError):
+            score = 0.0
+        try:
+            rank = int(rating.get("rank") or 0)
+        except (TypeError, ValueError):
+            rank = 0
+        subject_id = entry.get("id") or entry.get("url") or entry.get("name")
+        title = str(entry.get("name_cn") or entry.get("name") or "未命名番剧").strip()
+        summary = strip_html(entry.get("summary"), 240) or "Bangumi 番剧条目"
+        images = entry.get("images") if isinstance(entry.get("images"), dict) else {}
+        items.append(
+            {
+                "id": f"{config['id']}-{subject_id}",
+                "source_id": config["id"],
+                "source": config["name"],
+                "tone": config["tone"],
+                "section": config["section"],
+                "category": "文娱",
+                "entertainment_kind": "anime",
+                "title": title,
+                "summary": summary,
+                "url": entry.get("url") or f"https://bgm.tv/subject/{subject_id}",
+                "published_at": parse_date(entry.get("date")),
+                "heat": score * 10,
+                "metrics": {"评分": score, "排名": rank} if rank else {"评分": score},
+                "score": score,
+                "rank": rank,
+                "image_url": images.get("large") or images.get("common") or images.get("medium") or "",
             }
         )
     return items
@@ -806,6 +919,20 @@ def _tft_entry_name(entry: dict) -> str:
     return str(entry.get("name") or entry.get("displayName") or entry.get("characterName") or entry.get("apiName") or "未知")
 
 
+def _tft_icon_url(entry: dict) -> str:
+    """Turn CommunityDragon's asset path into a browser-loadable image URL."""
+    icon = entry.get("icon") or entry.get("iconPath") or entry.get("image")
+    if not icon:
+        return ""
+    icon = str(icon).replace("\\", "/").strip()
+    if icon.startswith(("http://", "https://")):
+        return icon
+    icon = icon.lstrip("/")
+    if icon.lower().startswith("assets/"):
+        icon = icon[7:]
+    return f"https://raw.communitydragon.org/latest/game/assets/{quote(icon, safe='/._-')}"
+
+
 def _tft_api_name(entry: dict) -> str:
     return str(entry.get("apiName") or entry.get("api_name") or "").lower()
 
@@ -826,14 +953,19 @@ def _tft_traits(entry: dict) -> list[str]:
 def _tft_is_unit(entry: dict) -> bool:
     name = _tft_entry_name(entry).lower()
     api_name = _tft_api_name(entry)
-    if any(token in name for token in ("training dummy", "rift scuttler", "voidspawn")):
+    if any(token in name for token in ("training dummy", "rift scuttler", "voidspawn", "golem", "krug", "murk wolf", "murkwolf", "razorbeak", "rift herald", "mechacannon", "mechadrone", "mechaminion", "mechasoldier", "mechazir")):
         return False
     if "summon" in api_name or "dummy" in api_name or "scuttle" in api_name:
+        return False
+    # Neutral monsters and temporary mech units usually have a cost but no
+    # playable trait. Requiring traits prevents them from leaking into the
+    # champion list when CommunityDragon changes its collection shape.
+    if not _tft_traits(entry):
         return False
     cost = entry.get("cost") or entry.get("tier")
     if isinstance(cost, (int, float)):
         return cost > 0
-    return bool(_tft_traits(entry)) and bool(entry.get("stats"))
+    return bool(entry.get("stats"))
 
 
 def _tft_is_augment(entry: dict) -> bool:
@@ -886,7 +1018,16 @@ def parse_tft_live_patch(raw: bytes, config: dict, require_version: bool = True)
     raw_items = _tft_collection(payload, collections["装备"]) if isinstance(payload, dict) else []
     raw_traits = _tft_collection(payload, collections["羁绊"]) if isinstance(payload, dict) else []
     raw_augments = _tft_collection(payload, collections["强化符文"]) if isinstance(payload, dict) else []
-    units = [entry for entry in raw_units if isinstance(entry, dict) and _tft_is_unit(entry)]
+    units: list[dict] = []
+    seen_units: set[str] = set()
+    for entry in raw_units:
+        if not isinstance(entry, dict) or not _tft_is_unit(entry):
+            continue
+        unit_key = _tft_api_name(entry) or _tft_entry_name(entry).strip().lower()
+        if unit_key in seen_units:
+            continue
+        seen_units.add(unit_key)
+        units.append(entry)
     equipment = [entry for entry in raw_items if isinstance(entry, dict) and _tft_is_item(entry)]
     augments = [entry for entry in raw_augments if isinstance(entry, dict) and _tft_is_augment(entry)]
     if not augments:
@@ -902,7 +1043,7 @@ def parse_tft_live_patch(raw: bytes, config: dict, require_version: bool = True)
         name = _tft_entry_name(entry)
         cost = entry.get("cost") or entry.get("tier")
         traits = _tft_traits(entry)
-        unit_details.append({"name": name, "api_name": entry.get("apiName") or entry.get("api_name") or "", "cost": cost if isinstance(cost, (int, float)) else None, "traits": traits})
+        unit_details.append({"name": name, "api_name": entry.get("apiName") or entry.get("api_name") or "", "icon_url": _tft_icon_url(entry), "cost": cost if isinstance(cost, (int, float)) else None, "traits": traits})
         for trait in traits:
             trait_members.setdefault(trait, []).append(name)
     unit_details.sort(key=lambda item: (item["cost"] is None, item["cost"] or 0, item["name"]))
@@ -1219,6 +1360,9 @@ def build_payload(force: bool = False) -> dict:
                 elif config["kind"] == "nba":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_nba(raw, config)
+                elif config["kind"] == "bangumi":
+                    raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
+                    items = parse_bangumi(raw, config)
                 elif config["kind"] == "tft_live_patch":
                     data_items: list[dict] | None = None
                     data_errors: list[Exception] = []

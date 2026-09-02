@@ -14,6 +14,118 @@ const gameSubsectionLabels = {
   tft: "云顶之弈",
 };
 
+// CommunityDragon returns stable English identifiers even when the rest of
+// the dashboard is localized. Keep the mapping in the client so old cache
+// entries are localized immediately, without requiring a data refresh.
+const TFT_NAME_ZH = Object.freeze({
+  "A.M.P.": "A.M.P.",
+  "Alistar": "阿利斯塔",
+  "Anima Squad": "动物小队",
+  "Annie": "安妮",
+  "Aphelios": "厄斐琉斯",
+  "Aurora": "奥萝拉",
+  "Bastion": "堡垒",
+  "Brand": "布兰德",
+  "Braum": "布隆",
+  "Bruiser": "斗士",
+  "Cho'Gath": "科加斯",
+  "Cyberboss": "赛博老大",
+  "Darius": "德莱厄斯",
+  "Divinicorp": "天神集团",
+  "Dr. Mundo": "蒙多医生",
+  "Dynamo": "脉冲",
+  "Ekko": "艾克",
+  "Elise": "伊莉丝",
+  "Exotech": "源计划",
+  "Fiddlesticks": "费德提克",
+  "Galio": "加里奥",
+  "Golden Ox": "黄金之牛",
+  "Gragas": "古拉加斯",
+  "Graves": "格雷福斯",
+  "Illaoi": "俄洛伊",
+  "Jarvan IV": "嘉文四世",
+  "Jax": "贾克斯",
+  "Jhin": "烬",
+  "Jinx": "金克丝",
+  "Kindred": "千珏",
+  "Kobuko": "科布科",
+  "Kog'Maw": "克格莫",
+  "LeBlanc": "乐芙兰",
+  "Leona": "蕾欧娜",
+  "Marksman": "狙神",
+  "Milio": "米利欧",
+  "Miss Fortune": "厄运小姐",
+  "Mordekaiser": "莫德凯撒",
+  "Morgana": "莫甘娜",
+  "Naafiri": "纳亚菲利",
+  "Neeko": "妮蔻",
+  "Nidalee": "奈德丽",
+  "Nitro": "氮气",
+  "Poppy": "波比",
+  "Rapidfire": "迅击",
+  "Rengar": "雷恩加尔",
+  "Renekton": "雷克顿",
+  "Rhaast": "拉斯特",
+  "Samira": "莎弥拉",
+  "Sena": "赛娜",
+  "Senna": "赛娜",
+  "Sejuani": "瑟庄妮",
+  "Seraphine": "萨勒芬妮",
+  "Shaco": "萨科",
+  "Shyvana": "希瓦娜",
+  "Skarner": "斯卡纳",
+  "Slayer": "杀手",
+  "Street Demon": "街头恶魔",
+  "Sylas": "塞拉斯",
+  "Techie": "技术专家",
+  "Twisted Fate": "卡牌大师",
+  "Varus": "韦鲁斯",
+  "Vanguard": "重装战士",
+  "Vayne": "薇恩",
+  "Veigar": "维迦",
+  "Vi": "蔚",
+  "Viego": "佛耶戈",
+  "Xayah": "霞",
+  "Yuumi": "悠米",
+  "Zed": "劫",
+  "Zeri": "泽丽",
+  "Zyra": "婕拉",
+  "Reunion": "重聚",
+  "Unlikely Duo": "奇异搭档",
+  "Domination": "统御",
+  "Crimson Pact": "赤色契约",
+  "Rocket Collection": "火箭收藏家",
+  "Bruiser Crown": "斗士之冕",
+  "Small Prize": "小奖品",
+  "Large Prize": "大奖品",
+  "Golden Chest": "黄金宝箱",
+  "Golden Book": "黄金之书",
+  "Golden Sword": "黄金之剑",
+  "Golden Bag": "黄金福袋",
+});
+
+function localizeTftName(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (Object.prototype.hasOwnProperty.call(TFT_NAME_ZH, raw)) return TFT_NAME_ZH[raw];
+  const traitMatch = raw.match(/^Trait:\s*(.+)$/i);
+  if (traitMatch) return `羁绊：${localizeTftName(traitMatch[1])}`;
+  const lower = raw.toLowerCase();
+  const key = Object.keys(TFT_NAME_ZH).find((name) => name.toLowerCase() === lower);
+  return key ? TFT_NAME_ZH[key] : raw;
+}
+
+function tftUnitIconUrl(unit) {
+  if (unit?.icon_url) return safeUrl(unit.icon_url);
+  const apiName = String(unit?.api_name || "").trim();
+  if (!apiName) return "#";
+  return safeUrl(`https://raw.communitydragon.org/latest/game/assets/ux/tft/champions/${apiName.toLowerCase()}.png`);
+}
+
+function tftUnitInitial(name) {
+  return String(name || "?").trim().slice(0, 1).toUpperCase();
+}
+
 let worldFeatures = null;
 let worldMapPromise = null;
 
@@ -67,9 +179,9 @@ function formatDate(iso) {
 
 function updateDate() {
   const now = new Date();
-  $("#date-label").textContent = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
+  $("#date-label").textContent = now.toLocaleDateString("zh-CN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   $("#day-number").textContent = String(now.getDate()).padStart(2, "0");
-  $("#day-month").textContent = now.toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase();
+  $("#day-month").textContent = now.toLocaleDateString("zh-CN", { month: "long", year: "numeric" });
 }
 
 function renderCards() {
@@ -99,6 +211,11 @@ function renderCards() {
 
   if (state.section === "game" && state.gameSubsection === "tft") {
     renderTftPanel(filtered);
+    return;
+  }
+
+  if (state.section === "entertainment") {
+    renderEntertainment(filtered);
     return;
   }
 
@@ -261,11 +378,11 @@ function renderMarketMap(items) {
   }).join("");
   grid.innerHTML = `<div class="market-map">
     <div class="market-canvas" aria-label="全球市场行情地图">
-      <span class="map-caption">GLOBAL SESSION / ${escapeHtml(formatDate(indexItems[0]?.published_at || ""))}</span>
+      <span class="map-caption">全球交易时段 / ${escapeHtml(formatDate(indexItems[0]?.published_at || ""))}</span>
       ${renderWorldSvg(indexItems)}
     </div>
     <div class="market-readout">
-      <div class="readout-head"><span>MARKET PULSE / ${escapeHtml(scopeLabel)}</span><span>${indexItems.length} 个品种</span></div>
+      <div class="readout-head"><span>市场脉搏 / ${escapeHtml(scopeLabel)}</span><span>${indexItems.length} 个品种</span></div>
       ${rows}
       ${indexItems.length ? "" : `<p class="sector-empty">暂无该市场指数快照</p>`}
       <p class="readout-note">红色代表上涨，绿色代表下跌。数据为个人看板快照，不构成交易依据。</p>
@@ -288,7 +405,7 @@ function renderSectorBoard(items) {
   const scopeLabel = marketScopeLabels[state.marketScope] || marketScopeLabels.all;
   const emptyLabel = state.marketScope === "all" || state.marketScope === "cn" ? "暂无板块数据" : "该市场暂未接入板块接口";
   return `<section class="sector-board">
-    <div class="sector-board-head"><span>SECTOR BREADTH / ${escapeHtml(scopeLabel)}</span><span>板块涨跌</span></div>
+    <div class="sector-board-head"><span>板块宽度 / ${escapeHtml(scopeLabel)}</span><span>板块涨跌</span></div>
     <div class="sector-columns">
       <div class="sector-column"><div class="sector-column-title"><span class="sector-signal up"></span>领涨</div>${rising.length ? rising.map(sectorRow).join("") : `<p class="sector-empty">${emptyLabel}</p>`}</div>
       <div class="sector-column"><div class="sector-column-title"><span class="sector-signal down"></span>领跌</div>${falling.length ? falling.map(sectorRow).join("") : `<p class="sector-empty">${emptyLabel}</p>`}</div>
@@ -302,7 +419,7 @@ function renderFinanceNews(items) {
     const metrics = Object.entries(item.metrics || {}).map(([label, value]) => `<span>${escapeHtml(label)} <strong>${Number(value).toLocaleString("zh-CN")}</strong></span>`).join("");
     return `<article class="finance-news-row"><div class="finance-news-meta"><span class="source-dot ${escapeHtml(item.tone)}"></span><span>${escapeHtml(item.source)}</span><time>${escapeHtml(formatDate(item.published_at))}</time></div><a class="finance-news-title" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer">${escapeHtml(item.title)}</a><p>${escapeHtml(item.summary)}</p><div class="finance-news-bottom"><span class="metrics">${metrics || "金融"}</span>${item.sample ? `<span class="sample-note">示例缓存</span>` : ""}<a href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer">打开 <span aria-hidden="true">↗</span></a></div></article>`;
   }).join("");
-  return `<section class="finance-news"><div class="finance-news-head"><span>FINANCE SIGNALS</span><span>资讯流</span></div><div class="finance-news-grid">${rows}</div></section>`;
+  return `<section class="finance-news"><div class="finance-news-head"><span>金融信号</span><span>资讯流</span></div><div class="finance-news-grid">${rows}</div></section>`;
 }
 
 function renderSteamDeals(items) {
@@ -327,7 +444,7 @@ function renderSteamDeals(items) {
     </article>`;
   }).join("");
   grid.innerHTML = `<div class="steam-deals">
-    <div class="steam-deals-head"><span>STEAM DEALS</span><span>当前商店价格</span></div>
+    <div class="steam-deals-head"><span>Steam 折扣</span><span>当前商店价格</span></div>
     ${rows}
     <p class="steam-note">折扣来自 Steam 商店当前价格；历史最低价需要接入价格历史服务后再标注。</p>
   </div>`;
@@ -339,7 +456,7 @@ function renderTftPanel(items) {
   const metaItem = items.find((item) => item.tft_meta);
   const version = versionItem?.version || versionItem?.title.split(" · ")[1] || "待同步";
   const versionUrl = safeUrl(versionItem?.patch_url || (versionItem?.version ? officialTftPatchUrl(version) : versionItem?.url || officialTftPatchUrl(version)));
-  const versionSource = versionItem?.version_source || "待连接 Riot 数据";
+  const versionSource = versionItem?.version_source || "等待版本数据";
   const tftData = versionItem?.tft_data || {};
   const dataCounts = tftData.counts || {};
   const dataSamples = tftData.samples || {};
@@ -347,17 +464,24 @@ function renderTftPanel(items) {
   const hasTftData = Object.keys(dataCounts).length > 0;
   const dataState = hasTftData ? "已接入" : versionItem?.sample ? "示例" : "未获取";
   const dataStats = dataLabels.map((label) => `<div class="tft-stat"><span>${label}</span><strong>${dataCounts[label] ? Number(dataCounts[label]).toLocaleString("zh-CN") : "--"}</strong></div>`).join("");
-  const dataPreview = dataLabels.filter((label) => (dataSamples[label] || []).length).map((label) => `<div class="tft-data-line"><span>${label}</span><b>${escapeHtml(dataSamples[label].slice(0, 4).join(" · "))}</b></div>`).join("");
+  const dataPreview = dataLabels.filter((label) => (dataSamples[label] || []).length).map((label) => `<div class="tft-data-line"><span>${label}</span><b>${escapeHtml(dataSamples[label].slice(0, 4).map(localizeTftName).join(" · "))}</b></div>`).join("");
   const unitDetails = Array.isArray(tftData.units) ? tftData.units : [];
   const lineups = Array.isArray(tftData.lineups) ? tftData.lineups : [];
   const rankedComps = Array.isArray(metaItem?.tft_meta?.comps) ? metaItem.tft_meta.comps : [];
-  const unitRows = unitDetails.slice(0, 18).map((unit) => `<div class="tft-unit-row"><strong>${escapeHtml(unit.name)}</strong><span>${unit.cost ? `${escapeHtml(unit.cost)} 费` : ""}</span><b>${escapeHtml((unit.traits || []).join(" · ") || "未标注羁绊")}</b></div>`).join("");
-  const lineupRows = lineups.slice(0, 6).map((lineup) => `<div class="tft-lineup-row"><strong>${escapeHtml(lineup.name)}</strong><span>${escapeHtml((lineup.units || []).join(" · "))}</span></div>`).join("");
-  const rankedRows = rankedComps.slice(0, 8).map((comp, index) => `<div class="tft-rank-row"><i>${String(index + 1).padStart(2, "0")}</i><div><strong>${escapeHtml((comp.units || []).join(" · "))}</strong><span>N ${Number(comp.games || 0).toLocaleString("zh-CN")} · 前四 ${Number(comp.top4_rate || 0).toFixed(1)}% · 吃鸡 ${Number(comp.win_rate || 0).toFixed(1)}% · 平均 ${Number(comp.avg_placement || 0).toFixed(2)}</span></div></div>`).join("");
-  const rankSummary = metaItem?.tft_meta ? `NA / ${escapeHtml(metaItem.tft_meta.patch || "当前补丁")} · ${Number(metaItem.tft_meta.sample_games || 0).toLocaleString("zh-CN")} 名选手记录` : "尚未配置 Riot API";
+  const playableUnits = unitDetails.filter((unit) => unit && unit.name && Array.isArray(unit.traits) && unit.traits.length);
+  const unitRows = playableUnits.slice(0, 60).map((unit) => {
+    const name = localizeTftName(unit.name);
+    const traits = (unit.traits || []).map(localizeTftName).join(" · ") || "未标注羁绊";
+    const iconUrl = tftUnitIconUrl(unit);
+    const image = iconUrl !== "#" ? `<img src="${escapeHtml(iconUrl)}" alt="" loading="lazy" onerror="this.remove()" />` : "";
+    return `<article class="tft-unit-card"><div class="tft-unit-avatar"><span>${escapeHtml(tftUnitInitial(name))}</span>${image}</div><div class="tft-unit-copy"><strong>${escapeHtml(name)}</strong><span>${unit.cost ? `${escapeHtml(unit.cost)} 费` : "英雄"}</span><small>${escapeHtml(traits)}</small></div></article>`;
+  }).join("");
+  const lineupRows = lineups.slice(0, 6).map((lineup) => `<div class="tft-lineup-row"><strong>${escapeHtml(localizeTftName(lineup.name))}</strong><span>${escapeHtml((lineup.units || []).map(localizeTftName).join(" · "))}</span></div>`).join("");
+  const rankedRows = rankedComps.slice(0, 8).map((comp, index) => `<div class="tft-rank-row"><i>${String(index + 1).padStart(2, "0")}</i><div><strong>${escapeHtml((comp.units || []).map(localizeTftName).join(" · "))}</strong><span>场次 ${Number(comp.games || 0).toLocaleString("zh-CN")} · 前四 ${Number(comp.top4_rate || 0).toFixed(1)}% · 吃鸡 ${Number(comp.win_rate || 0).toFixed(1)}% · 平均排名 ${Number(comp.avg_placement || 0).toFixed(2)}</span></div></div>`).join("");
+  const rankSummary = metaItem?.tft_meta ? `美服 / ${escapeHtml(metaItem.tft_meta.patch || "当前补丁")} · ${Number(metaItem.tft_meta.sample_games || 0).toLocaleString("zh-CN")} 条对局记录` : "尚未配置 Riot API";
   grid.innerHTML = `<div class="tft-panel">
     <div class="tft-hero">
-      <div><p class="tft-kicker">TEAMFIGHT TACTICS / LIVE PATCH</p><h3>版本 ${escapeHtml(version)}</h3><p>当前版本：${escapeHtml(versionSource)}。公告可能按主版本号命名，小版本后缀不代表数据错误。</p></div>
+      <div><p class="tft-kicker">云顶之弈 / 当前版本</p><h3>版本 ${escapeHtml(version)}</h3><p>当前版本：${escapeHtml(versionSource)}。公告可能按主版本号命名，小版本后缀不代表数据错误。</p></div>
       <a class="tft-patch-link" href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">对应补丁公告 <span aria-hidden="true">↗</span></a>
     </div>
     <div class="tft-links">
@@ -369,26 +493,54 @@ function renderTftPanel(items) {
       </a>
     </div>
     <div class="tft-data">
-      <div class="tft-data-head"><span>TFT DATA SNAPSHOT</span><span>${dataState}</span></div>
+      <div class="tft-data-head"><span>数据快照</span><span>${dataState}</span></div>
       <div class="tft-stats">${dataStats}</div>
       ${dataPreview ? `<div class="tft-data-preview">${dataPreview}</div>` : `<p class="tft-data-empty">${versionItem?.sample ? "当前是示例缓存，外部 TFT 数据源连接后会替换。" : "当前缓存只有版本号，明细接口没有返回；点击右上角刷新即可重试，不需要继续等待。"}</p>`}
     </div>
     <div class="tft-composition">
-      <div class="tft-data-head"><span>UNIT / TRAIT LINKS</span><span>英雄对应羁绊</span></div>
+      <div class="tft-data-head"><span>英雄与羁绊</span><span>可上场 ${playableUnits.length} 位</span></div>
       ${unitRows ? `<div class="tft-unit-list">${unitRows}</div>` : `<p class="tft-data-empty">当前数据没有可识别的可上场英雄。</p>`}
     </div>
     <div class="tft-rankings">
-      <div class="tft-data-head"><span>COMP RANKINGS</span><span>${rankSummary}</span></div>
+      <div class="tft-data-head"><span>阵容排行</span><span>${rankSummary}</span></div>
       <div class="tft-rank-links"><a href="https://tftable.com/" target="_blank" rel="noreferrer">TFTable 阵容排行 <span aria-hidden="true">↗</span></a><a href="https://www.datatft.com/" target="_blank" rel="noreferrer">DataTFT 阵容排行 <span aria-hidden="true">↗</span></a></div>
-      ${rankedRows ? `<div class="tft-rank-list">${rankedRows}</div>` : lineupRows ? `<div class="tft-lineup-list">${lineupRows}</div>` : `<p class="tft-data-empty">未配置 Riot API key，当前只显示静态单位关系；配置后会按 NA 高段位对局计算前四率、吃鸡率和平均名次。</p>`}
+      ${rankedRows ? `<div class="tft-rank-list">${rankedRows}</div>` : lineupRows ? `<div class="tft-lineup-list">${lineupRows}</div>` : `<p class="tft-data-empty">未配置 Riot API 密钥，当前只显示静态单位关系；配置后会按美服高段位对局计算前四率、吃鸡率和平均名次。</p>`}
     </div>
     <div class="tft-checks">
-      <div class="tft-check-head"><span>INFORMATION EDGE</span><span>今日检查清单</span></div>
+      <div class="tft-check-head"><span>信息差</span><span>今日检查清单</span></div>
       <div class="tft-check"><span><i>01</i>版本变化</span><a href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">对应补丁公告 <span aria-hidden="true">↗</span></a></div>
       <div class="tft-check"><span><i>02</i>阵容强度</span><a href="https://www.datatft.com/" target="_blank" rel="noreferrer">DataTFT <span aria-hidden="true">↗</span></a></div>
       <div class="tft-check"><span><i>03</i>环境差异</span><a href="https://tftable.com/" target="_blank" rel="noreferrer">TFTable <span aria-hidden="true">↗</span></a></div>
     </div>
     <p class="tft-note">版本号来自 CommunityDragon 的 TFT live 数据，不再把英雄联盟 Data Dragon 版本列表当作云顶版本。公告链接按当前主版本 ${escapeHtml(version.split(".").slice(0, 2).join("."))} 定位。</p>
+  </div>`;
+}
+
+function entertainmentImage(item) {
+  const imageUrl = safeUrl(item.image_url);
+  return imageUrl !== "#"
+    ? `<img src="${escapeHtml(imageUrl)}" alt="" loading="lazy" onerror="this.remove()" />`
+    : `<span class="entertainment-poster-fallback">${escapeHtml(String(item.title || "文").slice(0, 1))}</span>`;
+}
+
+function renderEntertainment(items) {
+  const grid = $("#feed-grid");
+  const anime = items.filter((item) => item.entertainment_kind === "anime");
+  const shortDrama = items.filter((item) => item.entertainment_kind === "short-drama");
+  const novels = items.filter((item) => item.entertainment_kind === "novel");
+  const animeRows = anime.map((item, index) => {
+    const score = Number(item.score || item.metrics?.["评分"] || 0);
+    const rank = Number(item.rank || item.metrics?.["排名"] || 0);
+    return `<a class="entertainment-anime-card" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="entertainment-poster">${entertainmentImage(item)}<i>${rank || String(index + 1).padStart(2, "0")}</i></div><div class="entertainment-copy"><strong>${escapeHtml(item.title)}</strong><span>${score ? `评分 ${score.toFixed(1)}` : "暂无评分"}${rank ? ` · 总榜 ${rank}` : ""}</span><small>${escapeHtml(item.summary || "Bangumi 番剧条目")}</small></div></a>`;
+  }).join("");
+  const linkRows = (list, empty) => list.length ? list.map((item) => `<a class="entertainment-link-row" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><span class="entertainment-link-mark">${escapeHtml(String(item.title || "文").slice(0, 1))}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.summary || "")}</small></span><b>${item.sample ? "示例" : "打开"} ↗</b></a>`).join("") : `<p class="entertainment-empty">${empty}</p>`;
+  grid.innerHTML = `<div class="entertainment-board">
+    <section class="entertainment-feature">
+      <div class="entertainment-head"><span>番剧评分</span><a href="https://bgm.tv/anime" target="_blank" rel="noreferrer">打开 Bangumi ↗</a></div>
+      ${animeRows ? `<div class="entertainment-anime-grid">${animeRows}</div>` : `<p class="entertainment-empty">Bangumi 暂时没有返回番剧条目。</p>`}
+    </section>
+    <section class="entertainment-list-section"><div class="entertainment-head"><span>红果短剧热榜</span><span>短剧</span></div>${linkRows(shortDrama, "红果暂无稳定公开榜单接口，先保留官方入口。")}</section>
+    <section class="entertainment-list-section"><div class="entertainment-head"><span>小说榜单</span><span>起点</span></div>${linkRows(novels, "小说榜单接口待接入，先保留公开榜单入口。")}</section>
   </div>`;
 }
 
@@ -511,19 +663,19 @@ async function loadData(force = false) {
 
 const placeholderContent = {
   market: {
-    eyebrow: "NEXT MODULE / MARKET",
+    eyebrow: "下一模块 / 金融",
     title: "市场数据",
     copy: "沪深、港股、美股、黄金与板块行情将在这里汇总。",
     sources: ["指数与板块", "黄金现货", "自选列表"],
   },
   game: {
-    eyebrow: "DEALS & PATCHES / GAME",
+    eyebrow: "折扣与版本 / 游戏",
     title: "游戏",
     copy: "Steam 折扣和云顶之弈版本、数据集中在这里。",
     sources: ["Steam 折扣", "云顶之弈"],
   },
   sports: {
-    eyebrow: "NEXT MODULE / COMPETITION",
+    eyebrow: "下一模块 / 竞技",
     title: "竞技赛果",
     copy: "NBA、英雄联盟的赛程和比赛结果会集中在这里。",
     sources: ["NBA", "英雄联盟", "赛程提醒"],
@@ -539,10 +691,11 @@ function selectSection(section) {
   $("#feed-section").hidden = false;
   $("#placeholder-section").hidden = true;
   const headings = {
-    ai: ["CURATED FEED", "AI 信号"],
-    market: ["LIVE SNAPSHOT / FINANCE", "金融市场"],
-    game: ["DEALS & PATCHES", "游戏"],
-    sports: ["SCORES & FIXTURES", "竞技赛果"],
+    ai: ["精选信息流", "AI 信号"],
+    market: ["实时行情 / 金融", "金融市场"],
+    game: ["折扣与版本", "游戏"],
+    sports: ["赛果与赛程", "竞技赛果"],
+    entertainment: ["文娱榜单", "文娱"],
   };
   const [eyebrow, title] = headings[section] || headings.ai;
   $("#section-eyebrow").textContent = eyebrow;
