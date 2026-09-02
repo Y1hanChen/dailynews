@@ -10,4 +10,10 @@ The TFT version is fetched at runtime from CommunityDragon:
 
 <https://raw.communitydragon.org/cdragon/tft/en_us.json>
 
+The service also tries the latest-path and GitHub mirror when the primary host is unavailable:
+
+<https://raw.communitydragon.org/latest/cdragon/tft/en_us.json>
+
+<https://raw.githubusercontent.com/CommunityDragon/Data/master/cdragon/tft/en_us.json>
+
 CommunityDragon is a community-maintained mirror of Riot game data. The dashboard does not bundle the game data; it only stores the normalized version string in its local cache.

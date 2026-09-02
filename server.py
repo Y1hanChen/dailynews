@@ -121,6 +121,7 @@ SOURCE_CONFIG = [
         "subsection": "tft",
         "url": "https://raw.communitydragon.org/cdragon/tft/en_us.json",
         "data_fallback_url": "https://raw.communitydragon.org/latest/cdragon/tft/en_us.json",
+        "data_mirror_url": "https://raw.githubusercontent.com/CommunityDragon/Data/master/cdragon/tft/en_us.json",
         "version_fallback_url": "https://raw.communitydragon.org/api/v1/versions",
         "tone": "teal",
         "description": "CommunityDragon TFT live 数据版本号",
@@ -536,7 +537,7 @@ def parse_date(value: str | int | float | None) -> str:
         return datetime.now(timezone.utc).isoformat()
 
 
-def fetch_bytes(url: str, accept: str) -> bytes:
+def fetch_bytes(url: str, accept: str, timeout: float = 15) -> bytes:
     request = Request(
         url,
         headers={
@@ -545,7 +546,7 @@ def fetch_bytes(url: str, accept: str) -> bytes:
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         },
     )
-    with urlopen(request, timeout=15) as response:
+    with urlopen(request, timeout=timeout) as response:
         return response.read()
 
 
@@ -978,10 +979,10 @@ def build_payload(force: bool = False) -> dict:
                 elif config["kind"] == "tft_live_patch":
                     data_items: list[dict] | None = None
                     data_errors: list[Exception] = []
-                    data_urls = [config["url"], config.get("data_fallback_url")]
+                    data_urls = [config["url"], config.get("data_fallback_url"), config.get("data_mirror_url")]
                     for data_url in dict.fromkeys(url for url in data_urls if url):
                         try:
-                            raw = fetch_bytes(data_url, "application/json, text/plain;q=0.9")
+                            raw = fetch_bytes(data_url, "application/json, text/plain;q=0.9", timeout=8)
                             candidate_items = parse_tft_live_patch(raw, config, require_version=False)
                             if data_items is None:
                                 data_items = candidate_items
@@ -1000,7 +1001,7 @@ def build_payload(force: bool = False) -> dict:
                         fallback_url = config.get("version_fallback_url")
                         if fallback_url:
                             try:
-                                fallback_raw = fetch_bytes(fallback_url, "application/json, text/plain;q=0.9")
+                                fallback_raw = fetch_bytes(fallback_url, "application/json, text/plain;q=0.9", timeout=8)
                                 version_items = parse_tft_live_patch(fallback_raw, config)
                                 version_items[0]["tft_data"] = items[0].get("tft_data", {})
                                 items = version_items

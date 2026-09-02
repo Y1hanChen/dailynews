@@ -451,7 +451,8 @@ function renderStatuses(statuses = []) {
   };
   $("#source-status-list").innerHTML = statuses.map((status) => {
     const [label, className] = labels[status.state] || ["等待", "status-pending"];
-    return `<div class="status-line"><span>${escapeHtml(status.name)}</span><span class="${className}">${label} · ${status.count || 0}</span></div>`;
+    const reason = status.error ? " · 源失败" : "";
+    return `<div class="status-line"${status.error ? ` title="${escapeHtml(status.error)}"` : ""}><span>${escapeHtml(status.name)}</span><span class="${className}">${label} · ${status.count || 0}${reason}</span></div>`;
   }).join("");
 }
 
