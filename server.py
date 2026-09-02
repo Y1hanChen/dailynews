@@ -134,6 +134,7 @@ SOURCE_CONFIG = [
         "kind": "riot_tft_meta",
         "section": "game",
         "subsection": "tft",
+        "url": "https://developer.riotgames.com/apis#tft-match-v1",
         "tone": "coral",
         "description": "北美高段位对局的阵容统计（需要 RIOT_API_KEY）",
     },
@@ -1291,7 +1292,7 @@ def build_payload(force: bool = False) -> dict:
                     "short_name": c["short_name"],
                     "section": c["section"],
                     "description": c["description"],
-                    "url": c["url"],
+                    "url": c.get("url", ""),
                 }
                 for c in SOURCE_CONFIG
             ],
