@@ -202,6 +202,12 @@ https://dochub.gxtree.com/
 
 推送到 GitHub 不等于已经部署；如果推送后页面没有更新，需要在 Dochub 控制台确认仓库、分支 `main`、启动命令和 webhook/自动部署开关。
 
+### 私有 GitHub 仓库
+
+个人使用可以把仓库改为 `Private`，不会影响应用本身。需要在 Dochub 的 GitHub 集成中重新授权，或把该仓库授权给 Dochub 的 GitHub App；平台必须能读取私有仓库的 `main` 分支。若平台没有私有仓库读取权限，构建会在拉取代码阶段失败，改回 `Public` 或补充授权即可。
+
+Riot 开发 key 通常约 24 小时自动过期。过期 key 不会继续产生费用，也不会被服务使用；需要启用 NA 阵容采样时，在 Dochub 的服务环境变量中配置新生成的 `RIOT_API_KEY`，不要写入仓库、日志或前端代码。
+
 如果平台只支持静态托管，页面仍能打开，但 `/api/dashboard` 无法抓取数据；应改用支持 Python Web 进程的部署方式。
 
 ## 维护约定
