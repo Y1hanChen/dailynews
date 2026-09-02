@@ -336,6 +336,7 @@ function renderSteamDeals(items) {
 function renderTftPanel(items) {
   const grid = $("#feed-grid");
   const versionItem = items.find((item) => item.version || item.title.includes("云顶之弈"));
+  const metaItem = items.find((item) => item.tft_meta);
   const version = versionItem?.version || versionItem?.title.split(" · ")[1] || "待同步";
   const versionUrl = safeUrl(versionItem?.patch_url || (versionItem?.version ? officialTftPatchUrl(version) : versionItem?.url || officialTftPatchUrl(version)));
   const versionSource = versionItem?.version_source || "待连接 Riot 数据";
@@ -349,8 +350,11 @@ function renderTftPanel(items) {
   const dataPreview = dataLabels.filter((label) => (dataSamples[label] || []).length).map((label) => `<div class="tft-data-line"><span>${label}</span><b>${escapeHtml(dataSamples[label].slice(0, 4).join(" · "))}</b></div>`).join("");
   const unitDetails = Array.isArray(tftData.units) ? tftData.units : [];
   const lineups = Array.isArray(tftData.lineups) ? tftData.lineups : [];
+  const rankedComps = Array.isArray(metaItem?.tft_meta?.comps) ? metaItem.tft_meta.comps : [];
   const unitRows = unitDetails.slice(0, 18).map((unit) => `<div class="tft-unit-row"><strong>${escapeHtml(unit.name)}</strong><span>${unit.cost ? `${escapeHtml(unit.cost)} 费` : ""}</span><b>${escapeHtml((unit.traits || []).join(" · ") || "未标注羁绊")}</b></div>`).join("");
   const lineupRows = lineups.slice(0, 6).map((lineup) => `<div class="tft-lineup-row"><strong>${escapeHtml(lineup.name)}</strong><span>${escapeHtml((lineup.units || []).join(" · "))}</span></div>`).join("");
+  const rankedRows = rankedComps.slice(0, 8).map((comp, index) => `<div class="tft-rank-row"><i>${String(index + 1).padStart(2, "0")}</i><div><strong>${escapeHtml((comp.units || []).join(" · "))}</strong><span>N ${Number(comp.games || 0).toLocaleString("zh-CN")} · 前四 ${Number(comp.top4_rate || 0).toFixed(1)}% · 吃鸡 ${Number(comp.win_rate || 0).toFixed(1)}% · 平均 ${Number(comp.avg_placement || 0).toFixed(2)}</span></div></div>`).join("");
+  const rankSummary = metaItem?.tft_meta ? `NA / ${escapeHtml(metaItem.tft_meta.patch || "当前补丁")} · ${Number(metaItem.tft_meta.sample_games || 0).toLocaleString("zh-CN")} 名选手记录` : "尚未配置 Riot API";
   grid.innerHTML = `<div class="tft-panel">
     <div class="tft-hero">
       <div><p class="tft-kicker">TEAMFIGHT TACTICS / LIVE PATCH</p><h3>版本 ${escapeHtml(version)}</h3><p>当前版本：${escapeHtml(versionSource)}。公告可能按主版本号命名，小版本后缀不代表数据错误。</p></div>
@@ -374,9 +378,9 @@ function renderTftPanel(items) {
       ${unitRows ? `<div class="tft-unit-list">${unitRows}</div>` : `<p class="tft-data-empty">当前数据没有可识别的可上场英雄。</p>`}
     </div>
     <div class="tft-rankings">
-      <div class="tft-data-head"><span>COMP RANKINGS</span><span>实时榜单</span></div>
+      <div class="tft-data-head"><span>COMP RANKINGS</span><span>${rankSummary}</span></div>
       <div class="tft-rank-links"><a href="https://tftable.com/" target="_blank" rel="noreferrer">TFTable 阵容排行 <span aria-hidden="true">↗</span></a><a href="https://www.datatft.com/" target="_blank" rel="noreferrer">DataTFT 阵容排行 <span aria-hidden="true">↗</span></a></div>
-      ${lineupRows ? `<div class="tft-lineup-list">${lineupRows}</div>` : `<p class="tft-data-empty">CommunityDragon 只提供单位与羁绊关系，不含胜率/场次排名；排名以以上两个站点的实时榜单为准。</p>`}
+      ${rankedRows ? `<div class="tft-rank-list">${rankedRows}</div>` : lineupRows ? `<div class="tft-lineup-list">${lineupRows}</div>` : `<p class="tft-data-empty">未配置 Riot API key，当前只显示静态单位关系；配置后会按 NA 高段位对局计算前四率、吃鸡率和平均名次。</p>`}
     </div>
     <div class="tft-checks">
       <div class="tft-check-head"><span>INFORMATION EDGE</span><span>今日检查清单</span></div>

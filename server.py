@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import re
 import threading
 from datetime import datetime, timezone
@@ -13,7 +14,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from time import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, unquote, urlencode, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
 import mimetypes
 import xml.etree.ElementTree as ET
@@ -125,6 +126,16 @@ SOURCE_CONFIG = [
         "version_fallback_url": "https://raw.communitydragon.org/api/v1/versions",
         "tone": "teal",
         "description": "CommunityDragon TFT live 数据版本号",
+    },
+    {
+        "id": "tft-riot-meta",
+        "name": "Riot API · NA 阵容采样",
+        "short_name": "NA 阵容采样",
+        "kind": "riot_tft_meta",
+        "section": "game",
+        "subsection": "tft",
+        "tone": "coral",
+        "description": "北美高段位对局的阵容统计（需要 RIOT_API_KEY）",
     },
     {
         "id": "nba-scoreboard",
@@ -537,14 +548,17 @@ def parse_date(value: str | int | float | None) -> str:
         return datetime.now(timezone.utc).isoformat()
 
 
-def fetch_bytes(url: str, accept: str, timeout: float = 15) -> bytes:
+def fetch_bytes(url: str, accept: str, timeout: float = 15, extra_headers: dict[str, str] | None = None) -> bytes:
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": accept,
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    }
+    if extra_headers:
+        headers.update(extra_headers)
     request = Request(
         url,
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": accept,
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        },
+        headers=headers,
     )
     with urlopen(request, timeout=timeout) as response:
         return response.read()
@@ -887,7 +901,7 @@ def parse_tft_live_patch(raw: bytes, config: dict, require_version: bool = True)
         name = _tft_entry_name(entry)
         cost = entry.get("cost") or entry.get("tier")
         traits = _tft_traits(entry)
-        unit_details.append({"name": name, "cost": cost if isinstance(cost, (int, float)) else None, "traits": traits})
+        unit_details.append({"name": name, "api_name": entry.get("apiName") or entry.get("api_name") or "", "cost": cost if isinstance(cost, (int, float)) else None, "traits": traits})
         for trait in traits:
             trait_members.setdefault(trait, []).append(name)
     unit_details.sort(key=lambda item: (item["cost"] is None, item["cost"] or 0, item["name"]))
@@ -915,6 +929,164 @@ def parse_tft_live_patch(raw: bytes, config: dict, require_version: bool = True)
             "patch_url": patch_url,
             "version_source": "CommunityDragon TFT live",
             "tft_data": {"counts": data_counts, "samples": data_samples, "units": unit_details[:60], "lineups": lineups},
+        }
+    ]
+
+
+def _riot_json(url: str, api_key: str) -> dict | list:
+    raw = fetch_bytes(
+        url,
+        "application/json, text/plain;q=0.9",
+        timeout=10,
+        extra_headers={"X-Riot-Token": api_key},
+    )
+    payload = json.loads(raw.decode("utf-8"))
+    if not isinstance(payload, (dict, list)):
+        raise ValueError("Riot API response has an unsupported shape")
+    return payload
+
+
+def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        return max(minimum, min(maximum, int(os.getenv(name, str(default)))))
+    except ValueError:
+        return default
+
+
+def _friendly_tft_unit_name(character_id: str, static_units: dict[str, str]) -> str:
+    if character_id in static_units:
+        return static_units[character_id]
+    for key, value in static_units.items():
+        if key.lower() == character_id.lower():
+            return value
+    fallback = re.sub(r"^TFT\d*_", "", character_id, flags=re.IGNORECASE)
+    return fallback.replace("_", " ") or character_id
+
+
+def fetch_riot_tft_meta(config: dict, static_units: dict[str, str]) -> list[dict]:
+    """Sample NA high-elo matches and calculate transparent composition stats."""
+    api_key = os.getenv("RIOT_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("RIOT_API_KEY is not configured")
+    platform = os.getenv("RIOT_TFT_PLATFORM", "na1").strip().lower() or "na1"
+    routing = os.getenv("RIOT_TFT_ROUTING", "americas").strip().lower() or "americas"
+    player_limit = _env_int("RIOT_TFT_PLAYERS", 8, 1, 20)
+    match_limit = _env_int("RIOT_TFT_MATCHES", 50, 1, 100)
+    ids_per_player = _env_int("RIOT_TFT_MATCH_IDS_PER_PLAYER", 20, 1, 20)
+
+    ladder = _riot_json(f"https://{platform}.api.riotgames.com/tft/league/v1/challenger", api_key)
+    entries = ladder.get("entries", []) if isinstance(ladder, dict) else []
+    puuids = [value.strip() for value in os.getenv("RIOT_TFT_PUUIDS", "").split(",") if value.strip()]
+    for entry in entries[:player_limit]:
+        summoner_id = entry.get("summonerId") if isinstance(entry, dict) else None
+        if not summoner_id:
+            continue
+        summoner = _riot_json(f"https://{platform}.api.riotgames.com/tft/summoner/v1/summoners/{quote(str(summoner_id), safe='')}", api_key)
+        if isinstance(summoner, dict) and summoner.get("puuid"):
+            puuids.append(str(summoner["puuid"]))
+        if len(puuids) >= player_limit:
+            break
+    puuids = list(dict.fromkeys(puuids))[:player_limit]
+    if not puuids:
+        raise ValueError("Riot API returned no NA TFT PUUIDs")
+
+    match_ids: list[str] = []
+    for puuid in puuids:
+        response = _riot_json(
+            f"https://{routing}.api.riotgames.com/tft/match/v1/matches/by-puuid/{quote(puuid, safe='')}/ids?start=0&count={ids_per_player}",
+            api_key,
+        )
+        if isinstance(response, list):
+            match_ids.extend(str(match_id) for match_id in response)
+    match_ids = list(dict.fromkeys(match_ids))[:match_limit]
+    if not match_ids:
+        raise ValueError("Riot API returned no recent NA TFT matches")
+
+    records: list[tuple[str, dict]] = []
+    version_counts: dict[str, int] = {}
+    for match_id in match_ids:
+        match = _riot_json(f"https://{routing}.api.riotgames.com/tft/match/v1/matches/{quote(match_id, safe='')}", api_key)
+        info = match.get("info", {}) if isinstance(match, dict) else {}
+        version = str(info.get("game_version") or "unknown")
+        participants = info.get("participants", []) if isinstance(info, dict) else []
+        for participant in participants:
+            if not isinstance(participant, dict):
+                continue
+            try:
+                placement = int(participant.get("placement"))
+            except (TypeError, ValueError):
+                continue
+            units = participant.get("units") or []
+            if placement < 1 or placement > 8 or not isinstance(units, list) or len(units) < 3:
+                continue
+            records.append((version, participant))
+            version_counts[version] = version_counts.get(version, 0) + 1
+    if not records:
+        raise ValueError("Riot API matches contained no finished TFT participants")
+
+    requested_patch = os.getenv("RIOT_TFT_PATCH", "").strip()
+    target_version = requested_patch or max(version_counts, key=version_counts.get)
+    selected_records = [
+        (version, participant)
+        for version, participant in records
+        if version == target_version or version.startswith(f"{target_version}.") or target_version.startswith(f"{version}.")
+    ]
+    if not selected_records:
+        selected_records = records
+        target_version = "多版本混合"
+
+    compositions: dict[str, dict] = {}
+    for _, participant in selected_records:
+        names: dict[str, str] = {}
+        for unit in participant.get("units", []):
+            if not isinstance(unit, dict):
+                continue
+            character_id = str(unit.get("character_id") or unit.get("name") or "")
+            if character_id:
+                names[character_id] = _friendly_tft_unit_name(character_id, static_units)
+        if len(names) < 3:
+            continue
+        key = "|".join(sorted(names))
+        comp = compositions.setdefault(key, {"units": sorted(names.values()), "games": 0, "wins": 0, "top4": 0, "placement_sum": 0})
+        placement = int(participant.get("placement", 8))
+        comp["games"] += 1
+        comp["wins"] += placement == 1
+        comp["top4"] += placement <= 4
+        comp["placement_sum"] += placement
+
+    min_games = _env_int("RIOT_TFT_MIN_GAMES", 2, 1, 50)
+    ranked = []
+    for comp in compositions.values():
+        if comp["games"] < min_games:
+            continue
+        games = comp["games"]
+        ranked.append({
+            "units": comp["units"],
+            "games": games,
+            "win_rate": round(comp["wins"] / games * 100, 1),
+            "top4_rate": round(comp["top4"] / games * 100, 1),
+            "avg_placement": round(comp["placement_sum"] / games, 2),
+        })
+    ranked.sort(key=lambda comp: (-comp["top4_rate"], -comp["win_rate"], -comp["games"], comp["avg_placement"]))
+    ranked = ranked[:10]
+    sample_count = len(selected_records)
+    summary = f"NA 高段位采样 · {target_version} · {sample_count} 名玩家对局记录"
+    return [
+        {
+            "id": f"{config['id']}-{target_version}",
+            "source_id": config["id"],
+            "source": config["name"],
+            "tone": config["tone"],
+            "section": config["section"],
+            "subsection": config.get("subsection"),
+            "category": "游戏",
+            "title": f"NA 阵容排行 · {target_version}",
+            "summary": summary,
+            "url": "https://developer.riotgames.com/apis#tft-match-v1",
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "heat": ranked[0]["top4_rate"] if ranked else 0,
+            "metrics": {"样本": sample_count, "阵容": len(ranked)},
+            "tft_meta": {"region": "NA", "patch": target_version, "sample_games": sample_count, "comps": ranked},
         }
     ]
 
@@ -984,6 +1156,7 @@ def build_payload(force: bool = False) -> dict:
         disk_cache = load_disk_cache()
         all_items: list[dict] = []
         statuses: list[dict] = []
+        static_unit_names: dict[str, str] = {}
         # Start from the last good cache so a temporary outage cannot erase it.
         updated_cache = {"sources": dict(disk_cache.get("sources", {}))}
 
@@ -1079,6 +1252,11 @@ def build_payload(force: bool = False) -> dict:
                                     item["summary"] = "CommunityDragon 版本索引回退值。官方公告通常按主版本命名，小版本后缀可能不同。"
                             except (HTTPError, URLError, TimeoutError, OSError, ET.ParseError, json.JSONDecodeError, UnicodeError, ValueError):
                                 items[0]["version_source"] = "CommunityDragon TFT live（版本字段缺失）"
+                    for unit in items[0].get("tft_data", {}).get("units", []):
+                        if isinstance(unit, dict) and unit.get("api_name") and unit.get("name"):
+                            static_unit_names[str(unit["api_name"])] = str(unit["name"])
+                elif config["kind"] == "riot_tft_meta":
+                    items = fetch_riot_tft_meta(config, static_unit_names)
                 elif config["kind"] == "sample":
                     raise ValueError("sample-only source")
                 else:

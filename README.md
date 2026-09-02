@@ -88,6 +88,21 @@ https://www.zhihu.com/api/v4/columns/jiqizhixin/articles
 - 云顶之弈优先使用 CommunityDragon 的 TFT live 数据文件（主地址不可用时尝试 `latest` 路径和 GitHub 镜像）；若文件没有版本元数据，则回退到 CommunityDragon 版本索引。面板会展示版本、可上场英雄及其羁绊、同羁绊单位构成、装备和强化符文数量，并提供 DataTFT、TFTable 的阵容统计入口。不再把英雄联盟 Data Dragon 的版本列表直接当作云顶版本。CommunityDragon 不提供阵容胜率/场次排名，排行榜继续以 DataTFT/TFTable 的实时页面为准。补丁公告按当前主版本号生成官方公告链接；例如 `16.17.1` 通常对应 `16.17` 补丁说明，小版本后缀可能不同。TFT 数据请求单次超时为 8 秒，避免外部源不可达时页面长时间等待。
 - 金融栏目支持 `全部市场`、`A股`、`港股`、`美股`、`黄金` 点选切换。当前东方财富板块接口覆盖 A 股行业板块；港股、美股和黄金先展示指数/品种读数，页面会明确标注尚未接入板块接口。
 
+### NA TFT 阵容排名
+
+配置 `RIOT_API_KEY` 后，服务会从 NA 高段位榜单采样近期对局并计算阵容统计。默认使用 `na1` 平台和 `americas` 区域路由；可通过环境变量调整采样规模：
+
+```text
+RIOT_API_KEY=不要提交到仓库
+RIOT_TFT_PLATFORM=na1
+RIOT_TFT_ROUTING=americas
+RIOT_TFT_PLAYERS=8
+RIOT_TFT_MATCHES=50
+RIOT_TFT_MIN_GAMES=2
+```
+
+没有配置 key 时，云顶栏目仍展示 CommunityDragon 静态数据，NA 排名状态会显示为未配置，不会阻塞其他栏目。
+
 ## 接口
 
 看板页面调用：

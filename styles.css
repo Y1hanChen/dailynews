@@ -258,6 +258,12 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .tft-rank-links a { color: var(--ink); font-size: 12px; text-decoration: none; }
 .tft-rank-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .tft-rank-links span { margin-left: 3px; color: var(--muted); font-size: 14px; }
+.tft-rank-list { display: grid; gap: 0; margin-top: 12px; }
+.tft-rank-row { display: grid; grid-template-columns: 27px minmax(0, 1fr); gap: 8px; min-height: 48px; padding: 7px 0; border-bottom: 1px solid rgba(31, 33, 31, .1); }
+.tft-rank-row > i { color: var(--faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-style: normal; }
+.tft-rank-row > div { display: grid; gap: 3px; min-width: 0; }
+.tft-rank-row strong { overflow: hidden; color: var(--ink); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tft-rank-row span { overflow: hidden; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .tft-lineup-list { margin-top: 12px; }
 .tft-lineup-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 9px; min-height: 32px; padding: 5px 0; border-bottom: 1px solid rgba(31, 33, 31, .1); color: var(--muted); font-size: 11px; }
 .tft-lineup-row strong { color: var(--ink); font-weight: 600; }
