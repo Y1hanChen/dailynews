@@ -27,6 +27,21 @@ python3 server.py
 python3 server.py --host 0.0.0.0 --port 8787
 ```
 
+也可以用一键脚本启动。首次运行会创建 `.venv`；如果当前终端没有设置 `RIOT_API_KEY`，脚本会隐藏输入提示，直接回车即可跳过：
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+也可以提前通过环境变量传入 key（不会写入仓库）：
+
+```bash
+RIOT_API_KEY='新生成的 key' ./start.sh
+```
+
+服务默认监听 `0.0.0.0:8787`，可用 `HOST` 和 `PORT` 覆盖。脚本不依赖第三方 Python 包；如果以后新增 `requirements.txt`，会在启动时自动安装。
+
 如果当前机器访问外网需要工作区提供的代理，先执行：
 
 ```bash
