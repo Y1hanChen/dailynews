@@ -785,7 +785,7 @@ def _tft_entry_names(entries: list) -> list[str]:
     return names
 
 
-def parse_tft_live_patch(raw: bytes, config: dict) -> list[dict]:
+def parse_tft_live_patch(raw: bytes, config: dict, require_version: bool = True) -> list[dict]:
     """Read the live TFT data version, rather than the League client version list."""
     payload = json.loads(raw.decode("utf-8"))
     if isinstance(payload, list):
@@ -807,10 +807,11 @@ def parse_tft_live_patch(raw: bytes, config: dict) -> list[dict]:
         (match.group(0) for value in candidates for match in [re.search(r"\d+\.\d+(?:\.\d+)?", value)] if match),
         None,
     )
-    if not version:
+    if not version and require_version:
         raise ValueError("CommunityDragon TFT version is missing")
-    major_minor = ".".join(version.split(".")[:2])
-    patch_url = f"https://teamfighttactics.leagueoflegends.com/zh-cn/news/game-updates/teamfight-tactics-patch-{major_minor.replace('.', '-')}-notes/"
+    version = version or "待同步"
+    major_minor = ".".join(version.split(".")[:2]) if version != "待同步" else ""
+    patch_url = f"https://teamfighttactics.leagueoflegends.com/zh-cn/news/game-updates/teamfight-tactics-patch-{major_minor.replace('.', '-')}-notes/" if major_minor else "https://teamfighttactics.leagueoflegends.com/zh-cn/news/game-updates/"
     collections = {
         "英雄": ("champions", "units", "characters"),
         "装备": ("items", "itemData"),
@@ -834,12 +835,12 @@ def parse_tft_live_patch(raw: bytes, config: dict) -> list[dict]:
             "subsection": config.get("subsection"),
             "category": "游戏",
             "title": f"云顶之弈 · {version}",
-            "summary": f"CommunityDragon TFT live 数据版本。官方公告通常按 {major_minor} 主版本命名，小版本后缀可能不同。",
+            "summary": f"CommunityDragon TFT live 数据版本。官方公告通常按 {major_minor or '主版本'} 命名，小版本后缀可能不同。",
             "url": patch_url,
             "published_at": datetime.now(timezone.utc).isoformat(),
             "heat": 0,
             "metrics": {},
-            "version": version,
+            "version": version if version != "待同步" else "",
             "patch_url": patch_url,
             "version_source": "CommunityDragon TFT live",
             "tft_data": {"counts": data_counts, "samples": data_samples},
@@ -975,14 +976,15 @@ def build_payload(force: bool = False) -> dict:
                     items = parse_nba(raw, config)
                 elif config["kind"] == "tft_live_patch":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
-                    try:
-                        items = parse_tft_live_patch(raw, config)
-                    except ValueError:
+                    items = parse_tft_live_patch(raw, config, require_version=False)
+                    if not items[0].get("version"):
                         fallback_url = config.get("version_fallback_url")
                         if not fallback_url:
-                            raise
+                            raise ValueError("TFT live data has no version metadata")
                         fallback_raw = fetch_bytes(fallback_url, "application/json, text/plain;q=0.9")
-                        items = parse_tft_live_patch(fallback_raw, config)
+                        version_items = parse_tft_live_patch(fallback_raw, config)
+                        version_items[0]["tft_data"] = items[0].get("tft_data", {})
+                        items = version_items
                         for item in items:
                             item["version_source"] = "CommunityDragon patch index（回退）"
                             item["summary"] = "CommunityDragon 版本索引回退值。官方公告通常按主版本命名，小版本后缀可能不同。"
