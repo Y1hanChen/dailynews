@@ -347,6 +347,10 @@ function renderTftPanel(items) {
   const dataState = hasTftData ? "已接入" : versionItem?.sample ? "示例" : "未获取";
   const dataStats = dataLabels.map((label) => `<div class="tft-stat"><span>${label}</span><strong>${dataCounts[label] ? Number(dataCounts[label]).toLocaleString("zh-CN") : "--"}</strong></div>`).join("");
   const dataPreview = dataLabels.filter((label) => (dataSamples[label] || []).length).map((label) => `<div class="tft-data-line"><span>${label}</span><b>${escapeHtml(dataSamples[label].slice(0, 4).join(" · "))}</b></div>`).join("");
+  const unitDetails = Array.isArray(tftData.units) ? tftData.units : [];
+  const lineups = Array.isArray(tftData.lineups) ? tftData.lineups : [];
+  const unitRows = unitDetails.slice(0, 18).map((unit) => `<div class="tft-unit-row"><strong>${escapeHtml(unit.name)}</strong><span>${unit.cost ? `${escapeHtml(unit.cost)} 费` : ""}</span><b>${escapeHtml((unit.traits || []).join(" · ") || "未标注羁绊")}</b></div>`).join("");
+  const lineupRows = lineups.slice(0, 6).map((lineup) => `<div class="tft-lineup-row"><strong>${escapeHtml(lineup.name)}</strong><span>${escapeHtml((lineup.units || []).join(" · "))}</span></div>`).join("");
   grid.innerHTML = `<div class="tft-panel">
     <div class="tft-hero">
       <div><p class="tft-kicker">TEAMFIGHT TACTICS / LIVE PATCH</p><h3>版本 ${escapeHtml(version)}</h3><p>当前版本：${escapeHtml(versionSource)}。公告可能按主版本号命名，小版本后缀不代表数据错误。</p></div>
@@ -364,6 +368,15 @@ function renderTftPanel(items) {
       <div class="tft-data-head"><span>TFT DATA SNAPSHOT</span><span>${dataState}</span></div>
       <div class="tft-stats">${dataStats}</div>
       ${dataPreview ? `<div class="tft-data-preview">${dataPreview}</div>` : `<p class="tft-data-empty">${versionItem?.sample ? "当前是示例缓存，外部 TFT 数据源连接后会替换。" : "当前缓存只有版本号，明细接口没有返回；点击右上角刷新即可重试，不需要继续等待。"}</p>`}
+    </div>
+    <div class="tft-composition">
+      <div class="tft-data-head"><span>UNIT / TRAIT LINKS</span><span>英雄对应羁绊</span></div>
+      ${unitRows ? `<div class="tft-unit-list">${unitRows}</div>` : `<p class="tft-data-empty">当前数据没有可识别的可上场英雄。</p>`}
+    </div>
+    <div class="tft-rankings">
+      <div class="tft-data-head"><span>COMP RANKINGS</span><span>实时榜单</span></div>
+      <div class="tft-rank-links"><a href="https://tftable.com/" target="_blank" rel="noreferrer">TFTable 阵容排行 <span aria-hidden="true">↗</span></a><a href="https://www.datatft.com/" target="_blank" rel="noreferrer">DataTFT 阵容排行 <span aria-hidden="true">↗</span></a></div>
+      ${lineupRows ? `<div class="tft-lineup-list">${lineupRows}</div>` : `<p class="tft-data-empty">CommunityDragon 只提供单位与羁绊关系，不含胜率/场次排名；排名以以上两个站点的实时榜单为准。</p>`}
     </div>
     <div class="tft-checks">
       <div class="tft-check-head"><span>INFORMATION EDGE</span><span>今日检查清单</span></div>

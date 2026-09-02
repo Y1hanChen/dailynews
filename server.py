@@ -781,10 +781,55 @@ def _tft_entry_names(entries: list) -> list[str]:
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        name = entry.get("name") or entry.get("displayName") or entry.get("apiName")
+        name = entry.get("name") or entry.get("displayName") or entry.get("characterName") or entry.get("apiName")
         if name and str(name) not in names:
             names.append(str(name))
     return names
+
+
+def _tft_entry_name(entry: dict) -> str:
+    return str(entry.get("name") or entry.get("displayName") or entry.get("characterName") or entry.get("apiName") or "未知")
+
+
+def _tft_api_name(entry: dict) -> str:
+    return str(entry.get("apiName") or entry.get("api_name") or "").lower()
+
+
+def _tft_traits(entry: dict) -> list[str]:
+    values = entry.get("traits") or entry.get("associatedTraits") or entry.get("synergies") or []
+    if isinstance(values, dict):
+        values = list(values.values())
+    names: list[str] = []
+    for value in values if isinstance(values, list) else []:
+        if isinstance(value, dict):
+            value = value.get("name") or value.get("displayName") or value.get("apiName")
+        if value and str(value) not in names:
+            names.append(str(value))
+    return names
+
+
+def _tft_is_unit(entry: dict) -> bool:
+    name = _tft_entry_name(entry).lower()
+    api_name = _tft_api_name(entry)
+    if any(token in name for token in ("training dummy", "rift scuttler", "voidspawn")):
+        return False
+    if "summon" in api_name or "dummy" in api_name or "scuttle" in api_name:
+        return False
+    cost = entry.get("cost") or entry.get("tier")
+    if isinstance(cost, (int, float)):
+        return cost > 0
+    return bool(_tft_traits(entry)) and bool(entry.get("stats"))
+
+
+def _tft_is_augment(entry: dict) -> bool:
+    name = _tft_entry_name(entry).lower()
+    api_name = _tft_api_name(entry)
+    return "augment" in api_name or name.startswith("trait:") or name.endswith(" crown") or " crown" in name
+
+
+def _tft_is_item(entry: dict) -> bool:
+    api_name = _tft_api_name(entry)
+    return not _tft_is_augment(entry) and (bool(entry.get("composition")) or "_item_" in api_name or api_name.startswith("item_"))
 
 
 def parse_tft_live_patch(raw: bytes, config: dict, require_version: bool = True) -> list[dict]:
@@ -822,11 +867,35 @@ def parse_tft_live_patch(raw: bytes, config: dict, require_version: bool = True)
     }
     data_counts: dict[str, int] = {}
     data_samples: dict[str, list[str]] = {}
-    for label, aliases in collections.items():
-        entries = _tft_collection(payload, aliases) if isinstance(payload, dict) else []
+    raw_units = _tft_collection(payload, collections["英雄"]) if isinstance(payload, dict) else []
+    raw_items = _tft_collection(payload, collections["装备"]) if isinstance(payload, dict) else []
+    raw_traits = _tft_collection(payload, collections["羁绊"]) if isinstance(payload, dict) else []
+    raw_augments = _tft_collection(payload, collections["强化符文"]) if isinstance(payload, dict) else []
+    units = [entry for entry in raw_units if isinstance(entry, dict) and _tft_is_unit(entry)]
+    equipment = [entry for entry in raw_items if isinstance(entry, dict) and _tft_is_item(entry)]
+    augments = [entry for entry in raw_augments if isinstance(entry, dict) and _tft_is_augment(entry)]
+    if not augments:
+        augments = [entry for entry in raw_items if isinstance(entry, dict) and _tft_is_augment(entry)]
+    filtered_collections = {"英雄": units, "装备": equipment, "羁绊": raw_traits, "强化符文": augments}
+    for label, entries in filtered_collections.items():
         if entries:
             data_counts[label] = len(entries)
             data_samples[label] = _tft_entry_names(entries)[:6]
+    unit_details = []
+    trait_members: dict[str, list[str]] = {}
+    for entry in units:
+        name = _tft_entry_name(entry)
+        cost = entry.get("cost") or entry.get("tier")
+        traits = _tft_traits(entry)
+        unit_details.append({"name": name, "cost": cost if isinstance(cost, (int, float)) else None, "traits": traits})
+        for trait in traits:
+            trait_members.setdefault(trait, []).append(name)
+    unit_details.sort(key=lambda item: (item["cost"] is None, item["cost"] or 0, item["name"]))
+    lineups = [
+        {"name": trait, "units": members[:12]}
+        for trait, members in sorted(trait_members.items(), key=lambda pair: (-len(pair[1]), pair[0]))
+        if len(members) >= 2
+    ][:10]
     return [
         {
             "id": f"{config['id']}-{version}",
@@ -845,7 +914,7 @@ def parse_tft_live_patch(raw: bytes, config: dict, require_version: bool = True)
             "version": version if version != "待同步" else "",
             "patch_url": patch_url,
             "version_source": "CommunityDragon TFT live",
-            "tft_data": {"counts": data_counts, "samples": data_samples},
+            "tft_data": {"counts": data_counts, "samples": data_samples, "units": unit_details[:60], "lineups": lineups},
         }
     ]
 
