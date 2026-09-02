@@ -47,6 +47,7 @@ python3 server.py
 | `.cache.json` | 运行时生成的本地缓存，不提交 Git |
 | `assets/world.geojson` | 本地国家边界，用于金融行情地图 |
 | `THIRD_PARTY_NOTICES.md` | 地图边界数据来源和许可证说明 |
+| `TFT_RANKING_RESEARCH.md` | Riot API、第三方阵容榜和自建聚合方案调研 |
 
 ## 数据源
 
