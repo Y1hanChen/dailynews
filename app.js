@@ -343,6 +343,8 @@ function renderTftPanel(items) {
   const dataCounts = tftData.counts || {};
   const dataSamples = tftData.samples || {};
   const dataLabels = ["英雄", "装备", "羁绊", "强化符文"];
+  const hasTftData = Object.keys(dataCounts).length > 0;
+  const dataState = hasTftData ? "已接入" : versionItem?.sample ? "示例" : "未获取";
   const dataStats = dataLabels.map((label) => `<div class="tft-stat"><span>${label}</span><strong>${dataCounts[label] ? Number(dataCounts[label]).toLocaleString("zh-CN") : "--"}</strong></div>`).join("");
   const dataPreview = dataLabels.filter((label) => (dataSamples[label] || []).length).map((label) => `<div class="tft-data-line"><span>${label}</span><b>${escapeHtml(dataSamples[label].slice(0, 4).join(" · "))}</b></div>`).join("");
   grid.innerHTML = `<div class="tft-panel">
@@ -359,9 +361,9 @@ function renderTftPanel(items) {
       </a>
     </div>
     <div class="tft-data">
-      <div class="tft-data-head"><span>TFT DATA SNAPSHOT</span><span>${dataCounts.英雄 ? "已接入" : "等待数据"}</span></div>
+      <div class="tft-data-head"><span>TFT DATA SNAPSHOT</span><span>${dataState}</span></div>
       <div class="tft-stats">${dataStats}</div>
-      ${dataPreview ? `<div class="tft-data-preview">${dataPreview}</div>` : `<p class="tft-data-empty">版本接口已接通；当前缓存没有英雄、装备和羁绊明细，刷新数据后会在这里显示。</p>`}
+      ${dataPreview ? `<div class="tft-data-preview">${dataPreview}</div>` : `<p class="tft-data-empty">${versionItem?.sample ? "当前是示例缓存，外部 TFT 数据源连接后会替换。" : "当前缓存只有版本号，明细接口没有返回；点击右上角刷新即可重试，不需要继续等待。"}</p>`}
     </div>
     <div class="tft-checks">
       <div class="tft-check-head"><span>INFORMATION EDGE</span><span>今日检查清单</span></div>

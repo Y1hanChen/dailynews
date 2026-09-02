@@ -120,6 +120,7 @@ SOURCE_CONFIG = [
         "section": "game",
         "subsection": "tft",
         "url": "https://raw.communitydragon.org/cdragon/tft/en_us.json",
+        "data_fallback_url": "https://raw.communitydragon.org/latest/cdragon/tft/en_us.json",
         "version_fallback_url": "https://raw.communitydragon.org/api/v1/versions",
         "tone": "teal",
         "description": "CommunityDragon TFT live 数据版本号",
@@ -975,19 +976,39 @@ def build_payload(force: bool = False) -> dict:
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_nba(raw, config)
                 elif config["kind"] == "tft_live_patch":
-                    raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
-                    items = parse_tft_live_patch(raw, config, require_version=False)
+                    data_items: list[dict] | None = None
+                    data_errors: list[Exception] = []
+                    data_urls = [config["url"], config.get("data_fallback_url")]
+                    for data_url in dict.fromkeys(url for url in data_urls if url):
+                        try:
+                            raw = fetch_bytes(data_url, "application/json, text/plain;q=0.9")
+                            candidate_items = parse_tft_live_patch(raw, config, require_version=False)
+                            if data_items is None:
+                                data_items = candidate_items
+                            candidate_data = candidate_items[0].get("tft_data", {}).get("counts", {})
+                            current_data = data_items[0].get("tft_data", {}).get("counts", {})
+                            if len(candidate_data) > len(current_data):
+                                data_items = candidate_items
+                            if candidate_data:
+                                break
+                        except (HTTPError, URLError, TimeoutError, OSError, ET.ParseError, json.JSONDecodeError, UnicodeError, ValueError) as data_exc:
+                            data_errors.append(data_exc)
+                    if data_items is None:
+                        raise data_errors[0] if data_errors else ValueError("TFT live data is empty")
+                    items = data_items
                     if not items[0].get("version"):
                         fallback_url = config.get("version_fallback_url")
-                        if not fallback_url:
-                            raise ValueError("TFT live data has no version metadata")
-                        fallback_raw = fetch_bytes(fallback_url, "application/json, text/plain;q=0.9")
-                        version_items = parse_tft_live_patch(fallback_raw, config)
-                        version_items[0]["tft_data"] = items[0].get("tft_data", {})
-                        items = version_items
-                        for item in items:
-                            item["version_source"] = "CommunityDragon patch index（回退）"
-                            item["summary"] = "CommunityDragon 版本索引回退值。官方公告通常按主版本命名，小版本后缀可能不同。"
+                        if fallback_url:
+                            try:
+                                fallback_raw = fetch_bytes(fallback_url, "application/json, text/plain;q=0.9")
+                                version_items = parse_tft_live_patch(fallback_raw, config)
+                                version_items[0]["tft_data"] = items[0].get("tft_data", {})
+                                items = version_items
+                                for item in items:
+                                    item["version_source"] = "CommunityDragon patch index（回退）"
+                                    item["summary"] = "CommunityDragon 版本索引回退值。官方公告通常按主版本命名，小版本后缀可能不同。"
+                            except (HTTPError, URLError, TimeoutError, OSError, ET.ParseError, json.JSONDecodeError, UnicodeError, ValueError):
+                                items[0]["version_source"] = "CommunityDragon TFT live（版本字段缺失）"
                 elif config["kind"] == "sample":
                     raise ValueError("sample-only source")
                 else:
