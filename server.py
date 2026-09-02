@@ -25,6 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent
 CACHE_FILE = BASE_DIR / ".cache.json"
 CACHE_TTL_SECONDS = 15 * 60
 USER_AGENT = "DailyBoard/0.1 (personal use; RSS reader)"
+TFT_ENABLED = os.getenv("ENABLE_TFT", "0").strip().lower() in {"1", "true", "yes"}
 
 SOURCE_CONFIG = [
     {
@@ -152,11 +153,11 @@ SOURCE_CONFIG = [
         "id": "bangumi-anime",
         "name": "Bangumi · 番剧",
         "short_name": "Bangumi 番剧",
-        "kind": "bangumi",
+        "kind": "bangumi_calendar",
         "section": "entertainment",
-        "url": "https://api.bgm.tv/v0/subjects?type=2&sort=rank&limit=20",
+        "url": "https://api.bgm.tv/v0/calendar",
         "tone": "coral",
-        "description": "番剧评分与排名（Bangumi API）",
+        "description": "放送中新番、评分与放送日（Bangumi API）",
     },
     {
         "id": "hongguo-short-drama",
@@ -694,12 +695,26 @@ def parse_zhihu(raw: bytes, config: dict) -> list[dict]:
     return items
 
 
-def parse_bangumi(raw: bytes, config: dict) -> list[dict]:
+def parse_bangumi_calendar(raw: bytes, config: dict) -> list[dict]:
     payload = json.loads(raw.decode("utf-8"))
-    entries = payload.get("data", []) if isinstance(payload, dict) else []
+    entries: list[tuple[dict, str]] = []
+    if isinstance(payload, list):
+        for day in payload:
+            if not isinstance(day, dict):
+                continue
+            weekday = day.get("weekday") if isinstance(day.get("weekday"), dict) else {}
+            weekday_label = str(weekday.get("cn") or weekday.get("en") or "")
+            for entry in day.get("items", []) if isinstance(day.get("items"), list) else []:
+                if isinstance(entry, dict):
+                    entries.append((entry, weekday_label))
+    elif isinstance(payload, dict):
+        for entry in payload.get("data", []) if isinstance(payload.get("data"), list) else []:
+            if isinstance(entry, dict):
+                entries.append((entry, ""))
     items: list[dict] = []
-    for entry in entries:
-        if not isinstance(entry, dict):
+    seen_ids: set[str] = set()
+    for entry, weekday_label in entries:
+        if entry.get("type") not in (None, 2, "2"):
             continue
         rating = entry.get("rating") if isinstance(entry.get("rating"), dict) else {}
         try:
@@ -711,8 +726,12 @@ def parse_bangumi(raw: bytes, config: dict) -> list[dict]:
         except (TypeError, ValueError):
             rank = 0
         subject_id = entry.get("id") or entry.get("url") or entry.get("name")
+        subject_key = str(subject_id)
+        if subject_key in seen_ids:
+            continue
+        seen_ids.add(subject_key)
         title = str(entry.get("name_cn") or entry.get("name") or "未命名番剧").strip()
-        summary = strip_html(entry.get("summary"), 240) or "Bangumi 番剧条目"
+        summary = strip_html(entry.get("summary"), 240) or "Bangumi 放送中新番"
         images = entry.get("images") if isinstance(entry.get("images"), dict) else {}
         items.append(
             {
@@ -726,11 +745,13 @@ def parse_bangumi(raw: bytes, config: dict) -> list[dict]:
                 "title": title,
                 "summary": summary,
                 "url": entry.get("url") or f"https://bgm.tv/subject/{subject_id}",
-                "published_at": parse_date(entry.get("date")),
+                "published_at": parse_date(entry.get("air_date") or entry.get("date")),
                 "heat": score * 10,
                 "metrics": {"评分": score, "排名": rank} if rank else {"评分": score},
                 "score": score,
                 "rank": rank,
+                "air_date": entry.get("air_date") or entry.get("date") or "",
+                "air_weekday": weekday_label,
                 "image_url": images.get("large") or images.get("common") or images.get("medium") or "",
             }
         )
@@ -1304,6 +1325,10 @@ def build_payload(force: bool = False) -> dict:
 
         for config in SOURCE_CONFIG:
             source_id = config["id"]
+            if config.get("subsection") == "tft" and not TFT_ENABLED:
+                # Keep the adapter available for later re-enablement, but do
+                # not expose stale or cross-set TFT data in the dashboard.
+                continue
             try:
                 if config["kind"] == "rss":
                     raw = fetch_bytes(config["url"], "application/rss+xml, application/xml, text/xml;q=0.9")
@@ -1360,9 +1385,9 @@ def build_payload(force: bool = False) -> dict:
                 elif config["kind"] == "nba":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_nba(raw, config)
-                elif config["kind"] == "bangumi":
+                elif config["kind"] == "bangumi_calendar":
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
-                    items = parse_bangumi(raw, config)
+                    items = parse_bangumi_calendar(raw, config)
                 elif config["kind"] == "tft_live_patch":
                     data_items: list[dict] | None = None
                     data_errors: list[Exception] = []
@@ -1429,6 +1454,7 @@ def build_payload(force: bool = False) -> dict:
             "items": all_items,
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "statuses": statuses,
+            "features": {"tft_enabled": TFT_ENABLED},
             "sources": [
                 {
                     "id": c["id"],

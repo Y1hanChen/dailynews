@@ -14,6 +14,12 @@ const gameSubsectionLabels = {
   tft: "云顶之弈",
 };
 
+function enabledGameSubsectionLabels() {
+  return state.payload?.features?.tft_enabled === false
+    ? { steam: gameSubsectionLabels.steam }
+    : gameSubsectionLabels;
+}
+
 // CommunityDragon returns stable English identifiers even when the rest of
 // the dashboard is localized. Keep the mapping in the client so old cache
 // entries are localized immediately, without requiring a data refresh.
@@ -538,7 +544,8 @@ function renderEntertainment(items) {
   const animeRows = anime.map((item, index) => {
     const score = Number(item.score || item.metrics?.["评分"] || 0);
     const rank = Number(item.rank || item.metrics?.["排名"] || 0);
-    return `<a class="entertainment-anime-card" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="entertainment-poster">${entertainmentImage(item)}<i>${rank || String(index + 1).padStart(2, "0")}</i></div><div class="entertainment-copy"><strong>${escapeHtml(item.title)}</strong><span>${score ? `评分 ${score.toFixed(1)}` : "暂无评分"}${rank ? ` · 总榜 ${rank}` : ""}</span><small>${escapeHtml(item.summary || "Bangumi 番剧条目")}</small></div></a>`;
+    const airLabel = [item.air_weekday, item.air_date].filter(Boolean).join(" · ");
+    return `<a class="entertainment-anime-card" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="entertainment-poster">${entertainmentImage(item)}<i>${rank || String(index + 1).padStart(2, "0")}</i></div><div class="entertainment-copy"><strong>${escapeHtml(item.title)}</strong><span>${score ? `评分 ${score.toFixed(1)}` : "暂无评分"}${airLabel ? ` · ${escapeHtml(airLabel)}` : ""}</span><small>${escapeHtml(item.summary || "Bangumi 放送中新番")}</small></div></a>`;
   }).join("");
   const linkRows = (list, empty) => list.length ? list.map((item) => `<a class="entertainment-link-row" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><span class="entertainment-link-mark">${escapeHtml(String(item.title || "文").slice(0, 1))}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.summary || "")}</small></span><b>${item.sample ? "示例" : "打开"} ↗</b></a>`).join("") : `<p class="entertainment-empty">${empty}</p>`;
   grid.innerHTML = `<div class="entertainment-board">
@@ -604,7 +611,9 @@ function renderSourceFilters() {
   const gameFilters = $("#game-subfilters");
   gameFilters.hidden = state.section !== "game";
   if (state.section === "game") {
-    gameFilters.innerHTML = Object.entries(gameSubsectionLabels).map(([subsection, label]) => `<button class="game-subfilter${state.gameSubsection === subsection ? " is-active" : ""}" type="button" data-game-subsection="${subsection}">${label}</button>`).join("");
+    const availableSubsections = enabledGameSubsectionLabels();
+    if (!Object.prototype.hasOwnProperty.call(availableSubsections, state.gameSubsection)) state.gameSubsection = "steam";
+    gameFilters.innerHTML = Object.entries(availableSubsections).map(([subsection, label]) => `<button class="game-subfilter${state.gameSubsection === subsection ? " is-active" : ""}" type="button" data-game-subsection="${subsection}">${label}</button>`).join("");
     bindGameSubsectionEvents();
   } else {
     gameFilters.innerHTML = "";
