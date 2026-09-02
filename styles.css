@@ -95,6 +95,7 @@ a { color: inherit; }
 .search-field input::placeholder { color: var(--faint); }
 select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); border-radius: 3px; background: var(--card); color: var(--muted); font-size: 13px; }
 .source-filters { display: flex; gap: 8px; margin-bottom: 21px; overflow-x: auto; scrollbar-width: none; }
+.source-filters[hidden] { display: none; }
 .source-filters::-webkit-scrollbar { display: none; }
 .source-filter { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 20px; padding: 7px 12px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; transition: border .2s, background .2s, color .2s; }
 .source-filter span { margin-left: 5px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
@@ -108,6 +109,14 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .market-scope-filter:last-child { border-right: 0; }
 .market-scope-filter:hover { color: var(--ink); background: rgba(251, 250, 247, .65); }
 .market-scope-filter.is-active { background: var(--ink); color: var(--paper); }
+.game-subfilters { display: flex; gap: 0; width: fit-content; max-width: 100%; margin: -7px 0 21px; overflow-x: auto; border-bottom: 1px solid var(--line-strong); scrollbar-width: none; }
+.game-subfilters[hidden] { display: none; }
+.game-subfilters::-webkit-scrollbar { display: none; }
+.game-subfilter { position: relative; flex: 0 0 auto; border: 0; padding: 8px 17px 10px; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; }
+.game-subfilter::after { position: absolute; right: 17px; bottom: -1px; left: 17px; height: 2px; background: transparent; content: ""; }
+.game-subfilter:hover { color: var(--ink); }
+.game-subfilter.is-active { color: var(--ink); font-weight: 700; }
+.game-subfilter.is-active::after { background: var(--coral); }
 
 .feed-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .market-map { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .8fr); gap: 12px; grid-column: 1 / -1; }
@@ -228,6 +237,17 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .tft-link b { font-size: 14px; }
 .tft-link small { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .tft-arrow { color: var(--muted); font-size: 17px; }
+.tft-data { margin: 18px 14px 0; padding: 16px 13px 15px; border-top: 1px solid var(--line); }
+.tft-data-head { display: flex; justify-content: space-between; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; letter-spacing: .08em; }
+.tft-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+.tft-stat { min-height: 58px; padding: 9px 10px; border: 1px solid var(--line); background: var(--paper-deep); }
+.tft-stat span { display: block; color: var(--muted); font-size: 11px; }
+.tft-stat strong { display: block; margin-top: 3px; font-size: 20px; font-weight: 700; }
+.tft-data-preview { display: grid; gap: 6px; margin-top: 11px; }
+.tft-data-line { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--muted); font-size: 11px; }
+.tft-data-line span { flex: 0 0 48px; color: var(--faint); }
+.tft-data-line b { overflow: hidden; color: var(--ink); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.tft-data-empty { margin: 11px 0 0; color: var(--faint); font-size: 11px; }
 .tft-checks { margin: 18px 14px 0; padding: 16px 13px 4px; border-top: 1px solid var(--line); }
 .tft-check-head { display: flex; justify-content: space-between; margin-bottom: 4px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; letter-spacing: .08em; }
 .tft-check { display: flex; align-items: center; justify-content: space-between; min-height: 42px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
@@ -324,6 +344,8 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
   .tft-hero { align-items: flex-start; flex-direction: column; gap: 18px; padding: 22px 20px; }
   .tft-hero h3 { font-size: 26px; }
   .tft-links { grid-template-columns: 1fr; padding: 11px 11px 0; }
+  .tft-data { margin: 15px 11px 0; }
+  .tft-stats { grid-template-columns: repeat(2, 1fr); }
   .tft-checks { margin: 15px 11px 0; }
   .tft-note { padding: 11px 20px 17px; }
   .sector-board, .finance-news { padding-right: 16px; padding-left: 16px; }

@@ -3,9 +3,15 @@ const state = {
   section: "ai",
   source: "all",
   marketScope: "all",
+  gameSubsection: "steam",
   query: "",
   sort: "time",
   payload: null,
+};
+
+const gameSubsectionLabels = {
+  steam: "Steam 折扣",
+  tft: "云顶之弈",
 };
 
 let worldFeatures = null;
@@ -13,6 +19,22 @@ let worldMapPromise = null;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+function itemSection(item) {
+  if (item.section === "steam" || item.section === "tft") return "game";
+  if (item.source_id === "steam-specials" || item.source_id === "tft-riot-version") return "game";
+  return item.section || "ai";
+}
+
+function itemGameSubsection(item) {
+  if (item.subsection) return item.subsection;
+  return item.source_id === "tft-riot-version" || item.section === "tft" ? "tft" : "steam";
+}
+
+function currentSectionItems() {
+  return state.items.filter((item) => itemSection(item) === state.section)
+    .filter((item) => state.section !== "game" || itemGameSubsection(item) === state.gameSubsection);
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -52,8 +74,7 @@ function updateDate() {
 
 function renderCards() {
   const query = state.query.trim().toLowerCase();
-  const filtered = state.items
-    .filter((item) => (item.section || "ai") === state.section)
+  const filtered = currentSectionItems()
     .filter((item) => state.source === "all" || item.source_id === state.source)
     .filter((item) => !query || `${item.title} ${item.summary} ${item.source}`.toLowerCase().includes(query))
     .sort((a, b) => state.sort === "heat"
@@ -71,12 +92,12 @@ function renderCards() {
     return;
   }
 
-  if (state.section === "steam") {
+  if (state.section === "game" && state.gameSubsection === "steam") {
     renderSteamDeals(filtered);
     return;
   }
 
-  if (state.section === "tft") {
+  if (state.section === "game" && state.gameSubsection === "tft") {
     renderTftPanel(filtered);
     return;
   }
@@ -318,6 +339,12 @@ function renderTftPanel(items) {
   const version = versionItem?.version || versionItem?.title.split(" · ")[1] || "待同步";
   const versionUrl = safeUrl(versionItem?.patch_url || (versionItem?.version ? officialTftPatchUrl(version) : versionItem?.url || officialTftPatchUrl(version)));
   const versionSource = versionItem?.version_source || "待连接 Riot 数据";
+  const tftData = versionItem?.tft_data || {};
+  const dataCounts = tftData.counts || {};
+  const dataSamples = tftData.samples || {};
+  const dataLabels = ["英雄", "装备", "羁绊", "强化符文"];
+  const dataStats = dataLabels.map((label) => `<div class="tft-stat"><span>${label}</span><strong>${dataCounts[label] ? Number(dataCounts[label]).toLocaleString("zh-CN") : "--"}</strong></div>`).join("");
+  const dataPreview = dataLabels.filter((label) => (dataSamples[label] || []).length).map((label) => `<div class="tft-data-line"><span>${label}</span><b>${escapeHtml(dataSamples[label].slice(0, 4).join(" · "))}</b></div>`).join("");
   grid.innerHTML = `<div class="tft-panel">
     <div class="tft-hero">
       <div><p class="tft-kicker">TEAMFIGHT TACTICS / LIVE PATCH</p><h3>版本 ${escapeHtml(version)}</h3><p>当前版本：${escapeHtml(versionSource)}。公告可能按主版本号命名，小版本后缀不代表数据错误。</p></div>
@@ -331,6 +358,11 @@ function renderTftPanel(items) {
         <span class="tft-link-icon">T</span><span><b>TFTable</b><small>环境、阵容强度与版本参考</small></span><span class="tft-arrow" aria-hidden="true">↗</span>
       </a>
     </div>
+    <div class="tft-data">
+      <div class="tft-data-head"><span>TFT DATA SNAPSHOT</span><span>${dataCounts.英雄 ? "已接入" : "等待数据"}</span></div>
+      <div class="tft-stats">${dataStats}</div>
+      ${dataPreview ? `<div class="tft-data-preview">${dataPreview}</div>` : `<p class="tft-data-empty">版本接口已接通；当前缓存没有英雄、装备和羁绊明细，刷新数据后会在这里显示。</p>`}
+    </div>
     <div class="tft-checks">
       <div class="tft-check-head"><span>INFORMATION EDGE</span><span>今日检查清单</span></div>
       <div class="tft-check"><span><i>01</i>版本变化</span><a href="${escapeHtml(versionUrl)}" target="_blank" rel="noreferrer">对应补丁公告 <span aria-hidden="true">↗</span></a></div>
@@ -342,7 +374,7 @@ function renderTftPanel(items) {
 }
 
 function renderCounts() {
-  const sectionItems = state.items.filter((item) => (item.section || "ai") === state.section);
+  const sectionItems = currentSectionItems();
   const counts = sectionItems.reduce((acc, item) => {
     acc[item.source_id] = (acc[item.source_id] || 0) + 1;
     return acc;
@@ -371,6 +403,15 @@ function bindMarketScopeEvents() {
   }));
 }
 
+function bindGameSubsectionEvents() {
+  $$(".game-subfilter").forEach((button) => button.addEventListener("click", () => {
+    state.gameSubsection = button.dataset.gameSubsection;
+    $$(".game-subfilter").forEach((node) => node.classList.toggle("is-active", node === button));
+    renderCounts();
+    renderCards();
+  }));
+}
+
 function renderSourceFilters() {
   const container = $("#source-filters");
   const sources = (state.payload?.sources || []).filter((source) => source.section === state.section);
@@ -378,9 +419,18 @@ function renderSourceFilters() {
     acc[item.source_id] = (acc[item.source_id] || 0) + 1;
     return acc;
   }, {});
-  container.innerHTML = `<button class="source-filter is-active" type="button" data-source="all">全部 <span id="all-count">${state.items.filter((item) => (item.section || "ai") === state.section).length}</span></button>`
+  container.hidden = state.section === "game";
+  container.innerHTML = `<button class="source-filter is-active" type="button" data-source="all">全部 <span id="all-count">${currentSectionItems().length}</span></button>`
     + sources.map((source) => `<button class="source-filter" type="button" data-source="${escapeHtml(source.id)}">${escapeHtml(source.short_name || source.name)} <span data-count-for="${escapeHtml(source.id)}">${counts[source.id] || 0}</span></button>`).join("");
-  bindSourceEvents();
+  if (state.section !== "game") bindSourceEvents();
+  const gameFilters = $("#game-subfilters");
+  gameFilters.hidden = state.section !== "game";
+  if (state.section === "game") {
+    gameFilters.innerHTML = Object.entries(gameSubsectionLabels).map(([subsection, label]) => `<button class="game-subfilter${state.gameSubsection === subsection ? " is-active" : ""}" type="button" data-game-subsection="${subsection}">${label}</button>`).join("");
+    bindGameSubsectionEvents();
+  } else {
+    gameFilters.innerHTML = "";
+  }
   const marketFilters = $("#market-scope-filters");
   marketFilters.hidden = state.section !== "market";
   if (state.section === "market") {
@@ -446,17 +496,11 @@ const placeholderContent = {
     copy: "沪深、港股、美股、黄金与板块行情将在这里汇总。",
     sources: ["指数与板块", "黄金现货", "自选列表"],
   },
-  steam: {
-    eyebrow: "DEALS & PRICES / STEAM",
-    title: "Steam 折扣",
-    copy: "当前特惠和价格变化集中在这里。",
-    sources: ["当前折扣", "价格榜", "史低待接入"],
-  },
-  tft: {
-    eyebrow: "PATCH & META / TFT",
-    title: "云顶之弈",
-    copy: "版本变化、阵容强度和环境差异集中在这里。",
-    sources: ["Riot 版本", "DataTFT", "TFTable"],
+  game: {
+    eyebrow: "DEALS & PATCHES / GAME",
+    title: "游戏",
+    copy: "Steam 折扣和云顶之弈版本、数据集中在这里。",
+    sources: ["Steam 折扣", "云顶之弈"],
   },
   sports: {
     eyebrow: "NEXT MODULE / COMPETITION",
@@ -471,13 +515,13 @@ function selectSection(section) {
   state.section = section;
   state.source = "all";
   state.marketScope = "all";
+  state.gameSubsection = "steam";
   $("#feed-section").hidden = false;
   $("#placeholder-section").hidden = true;
   const headings = {
     ai: ["CURATED FEED", "AI 信号"],
     market: ["LIVE SNAPSHOT / FINANCE", "金融市场"],
-    steam: ["DEALS & PRICES", "Steam 折扣"],
-    tft: ["PATCH & META", "云顶之弈"],
+    game: ["DEALS & PATCHES", "游戏"],
     sports: ["SCORES & FIXTURES", "竞技赛果"],
   };
   const [eyebrow, title] = headings[section] || headings.ai;

@@ -106,7 +106,8 @@ SOURCE_CONFIG = [
         "name": "Steam 特惠",
         "short_name": "Steam",
         "kind": "steam",
-        "section": "steam",
+        "section": "game",
+        "subsection": "steam",
         "url": "https://store.steampowered.com/api/featuredcategories?cc=CN&l=schinese",
         "tone": "blue",
         "description": "当前特惠价格与折扣",
@@ -116,7 +117,8 @@ SOURCE_CONFIG = [
         "name": "拳头 · 云顶之弈",
         "short_name": "云顶之弈",
         "kind": "tft_live_patch",
-        "section": "tft",
+        "section": "game",
+        "subsection": "tft",
         "url": "https://raw.communitydragon.org/cdragon/tft/en_us.json",
         "version_fallback_url": "https://raw.communitydragon.org/api/v1/versions",
         "tone": "teal",
@@ -403,7 +405,8 @@ SAMPLE_ITEMS = {
             "source_id": "steam-specials",
             "source": "Steam 特惠",
             "tone": "blue",
-            "section": "steam",
+            "section": "game",
+            "subsection": "steam",
             "category": "游戏",
             "title": "Steam 今日特惠",
             "summary": "连接 Steam 商店后显示当前折扣和价格；历史最低价需要额外的价格历史服务。",
@@ -437,7 +440,8 @@ SAMPLE_ITEMS = {
             "source_id": "tft-riot-version",
             "source": "拳头 · 云顶之弈",
             "tone": "teal",
-            "section": "tft",
+            "section": "game",
+            "subsection": "tft",
             "category": "游戏",
             "title": "云顶之弈 · 16.17.1",
             "summary": "离线示例：CommunityDragon TFT live 数据连接后显示当前版本；公告按主版本号定位。",
@@ -733,6 +737,7 @@ def parse_steam(raw: bytes, config: dict) -> list[dict]:
                     "source": config["name"],
                     "tone": config["tone"],
                     "section": config["section"],
+                    "subsection": config.get("subsection"),
                     "category": "游戏",
                     "title": entry.get("name") or "Steam 特惠",
                     "summary": f"折扣 {discount}% · {price}{original}",
@@ -749,6 +754,35 @@ def parse_steam(raw: bytes, config: dict) -> list[dict]:
             if len(items) >= 20:
                 return items
     return items
+
+
+def _tft_collection(payload: dict, aliases: tuple[str, ...]) -> list:
+    """Find a named TFT collection at the top level or in setData."""
+    containers = [payload]
+    set_data = payload.get("setData")
+    if isinstance(set_data, dict):
+        containers.extend(value for value in set_data.values() if isinstance(value, dict))
+    elif isinstance(set_data, list):
+        containers.extend(value for value in set_data if isinstance(value, dict))
+    for container in containers:
+        for key in aliases:
+            value = container.get(key)
+            if isinstance(value, list):
+                return value
+            if isinstance(value, dict):
+                return list(value.values())
+    return []
+
+
+def _tft_entry_names(entries: list) -> list[str]:
+    names: list[str] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name") or entry.get("displayName") or entry.get("apiName")
+        if name and str(name) not in names:
+            names.append(str(name))
+    return names
 
 
 def parse_tft_live_patch(raw: bytes, config: dict) -> list[dict]:
@@ -777,6 +811,19 @@ def parse_tft_live_patch(raw: bytes, config: dict) -> list[dict]:
         raise ValueError("CommunityDragon TFT version is missing")
     major_minor = ".".join(version.split(".")[:2])
     patch_url = f"https://teamfighttactics.leagueoflegends.com/zh-cn/news/game-updates/teamfight-tactics-patch-{major_minor.replace('.', '-')}-notes/"
+    collections = {
+        "英雄": ("champions", "units", "characters"),
+        "装备": ("items", "itemData"),
+        "羁绊": ("traits", "synergies"),
+        "强化符文": ("augments", "enhancements"),
+    }
+    data_counts: dict[str, int] = {}
+    data_samples: dict[str, list[str]] = {}
+    for label, aliases in collections.items():
+        entries = _tft_collection(payload, aliases) if isinstance(payload, dict) else []
+        if entries:
+            data_counts[label] = len(entries)
+            data_samples[label] = _tft_entry_names(entries)[:6]
     return [
         {
             "id": f"{config['id']}-{version}",
@@ -784,6 +831,7 @@ def parse_tft_live_patch(raw: bytes, config: dict) -> list[dict]:
             "source": config["name"],
             "tone": config["tone"],
             "section": config["section"],
+            "subsection": config.get("subsection"),
             "category": "游戏",
             "title": f"云顶之弈 · {version}",
             "summary": f"CommunityDragon TFT live 数据版本。官方公告通常按 {major_minor} 主版本命名，小版本后缀可能不同。",
@@ -794,6 +842,7 @@ def parse_tft_live_patch(raw: bytes, config: dict) -> list[dict]:
             "version": version,
             "patch_url": patch_url,
             "version_source": "CommunityDragon TFT live",
+            "tft_data": {"counts": data_counts, "samples": data_samples},
         }
     ]
 
