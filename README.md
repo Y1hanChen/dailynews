@@ -101,7 +101,7 @@ https://www.zhihu.com/api/v4/columns/jiqizhixin/articles
 - 金融地图使用本地 GeoJSON 国家轮廓，地图只做区域信号可视化，精确涨跌仍以底部读数为准。
 - Steam 使用商店特惠接口，只提供当前折扣；历史最低价需要另接价格历史服务。页面用价格榜而不是资讯卡片展示。
 - NBA 使用官方 CDN 赛果 JSON。赛季休赛期或接口风控时会显示缓存/示例。
-- Bangumi 使用公开的 `/v0/calendar` 接口获取放送中的新番，展示放送日、评分、排名和 Bangumi 海报，不再混入全站历史番剧总榜。红果短剧目前没有面向个人开发者的稳定公开榜单接口；小说榜单的站内接口通常需要动态请求或登录，因此先保留官方页面入口并标记为示例，后续接入公开源时再替换，不把示例当实时数据。
+- Bangumi 使用公开的 `/v0/calendar` 接口获取放送中的新番，展示放送日、评分、排名和 Bangumi 海报；“完结番”筛选通过 `/v0/search/subjects` 按年份和月份查询，不再混入全站历史番剧总榜。番剧卡片支持按需加载高赞评论，服务端会优先尝试 `p1/subject/{id}/comments`，再回退到 subject posts，并做短时缓存。红果短剧目前没有面向个人开发者的稳定公开榜单接口；小说榜单的站内接口通常需要动态请求或登录，因此先保留官方页面入口并标记为示例，后续接入公开源时再替换，不把示例当实时数据。
 
 ### TFT 临时停用
 
@@ -132,6 +132,8 @@ RIOT_TFT_MIN_GAMES=2
 GET /api/dashboard
 GET /api/dashboard?refresh=1
 GET /api/health
+GET /api/bangumi?mode=completed&year=2025&month=3
+GET /api/bangumi/comments?subject_id=123
 ```
 
 所有来源都被归一为以下字段：

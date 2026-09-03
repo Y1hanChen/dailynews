@@ -224,9 +224,18 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .entertainment-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 20px 13px; background: var(--paper-deep); color: var(--ink); font-size: 13px; font-weight: 700; }
 .entertainment-head a { color: var(--muted); font-size: 11px; font-weight: 500; text-decoration: none; }
 .entertainment-head a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.entertainment-mode-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; padding: 11px 20px 0; }
+.entertainment-mode-tabs { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 3px; overflow: hidden; }
+.entertainment-mode-tabs button { border: 0; border-right: 1px solid var(--line); padding: 6px 12px; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; }
+.entertainment-mode-tabs button:last-child { border-right: 0; }
+.entertainment-mode-tabs button:hover { color: var(--ink); background: var(--card); }
+.entertainment-mode-tabs button.is-active { background: var(--ink); color: var(--paper); }
+.entertainment-mode-controls label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
+.entertainment-mode-controls select { height: 30px; padding: 0 23px 0 7px; font-size: 11px; }
 .entertainment-anime-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 20px 20px; }
-.entertainment-anime-card { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; min-width: 0; padding: 8px; border: 1px solid var(--line); background: var(--paper-deep); border-radius: 4px; text-decoration: none; }
+.entertainment-anime-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; min-width: 0; padding: 8px; border: 1px solid var(--line); background: var(--paper-deep); border-radius: 4px; }
 .entertainment-anime-card:hover { border-color: var(--line-strong); }
+.entertainment-anime-main { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; min-width: 0; color: inherit; text-decoration: none; }
 .entertainment-poster { position: relative; width: 72px; height: 96px; overflow: hidden; background: #d9d6cc; }
 .entertainment-poster img { width: 100%; height: 100%; object-fit: cover; }
 .entertainment-poster > i { position: absolute; right: 4px; bottom: 4px; padding: 1px 4px; background: rgba(31, 33, 31, .8); color: var(--paper); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-style: normal; }
@@ -235,6 +244,13 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .entertainment-copy strong { display: -webkit-box; overflow: hidden; color: var(--ink); font-size: 12px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .entertainment-copy span { color: var(--coral); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
 .entertainment-copy small { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.bangumi-comments-button { justify-self: start; border: 0; padding: 3px 0; background: transparent; color: var(--teal); cursor: pointer; font-size: 10px; }
+.bangumi-comments-button:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.bangumi-comments-button:disabled { color: var(--faint); cursor: wait; }
+.bangumi-comments { display: grid; gap: 6px; padding-top: 5px; border-top: 1px solid var(--line); }
+.bangumi-comments p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.bangumi-comments blockquote { margin: 0; padding: 5px 7px; border-left: 2px solid var(--coral); background: var(--card); }
+.bangumi-comments blockquote footer { margin-top: 3px; color: var(--faint); font-size: 9px; }
 .entertainment-link-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 66px; padding: 10px 20px; border-bottom: 1px solid var(--line); text-decoration: none; }
 .entertainment-link-row:hover { background: var(--paper-deep); }
 .entertainment-link-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--teal); font-size: 12px; font-weight: 700; }
@@ -395,6 +411,7 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
   .steam-copy span { font-size: 10px; }
   .entertainment-anime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 11px; }
   .entertainment-head { padding-right: 13px; padding-left: 13px; }
+  .entertainment-mode-controls { padding: 9px 13px 0; }
   .entertainment-link-row { padding-right: 13px; padding-left: 13px; }
   .tft-hero { align-items: flex-start; flex-direction: column; gap: 18px; padding: 22px 20px; }
   .tft-hero h3 { font-size: 26px; }

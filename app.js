@@ -4,6 +4,14 @@ const state = {
   source: "all",
   marketScope: "all",
   gameSubsection: "steam",
+  animeMode: "airing",
+  animeYear: new Date().getFullYear(),
+  animeMonth: new Date().getMonth() + 1,
+  bangumiAiringItems: [],
+  bangumiCompletedItems: [],
+  bangumiRequestId: 0,
+  animeLoading: false,
+  animeError: "",
   query: "",
   sort: "time",
   payload: null,
@@ -544,18 +552,119 @@ function renderEntertainment(items) {
   const animeRows = anime.map((item, index) => {
     const score = Number(item.score || item.metrics?.["评分"] || 0);
     const rank = Number(item.rank || item.metrics?.["排名"] || 0);
-    const airLabel = [item.air_weekday, item.air_date].filter(Boolean).join(" · ");
-    return `<a class="entertainment-anime-card" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="entertainment-poster">${entertainmentImage(item)}<i>${rank || String(index + 1).padStart(2, "0")}</i></div><div class="entertainment-copy"><strong>${escapeHtml(item.title)}</strong><span>${score ? `评分 ${score.toFixed(1)}` : "暂无评分"}${airLabel ? ` · ${escapeHtml(airLabel)}` : ""}</span><small>${escapeHtml(item.summary || "Bangumi 放送中新番")}</small></div></a>`;
+    const airLabel = state.animeMode === "completed"
+      ? ["完结", item.air_date].filter(Boolean).join(" · ")
+      : [item.air_weekday, item.air_date].filter(Boolean).join(" · ");
+    const subjectId = String(item.subject_id || "");
+    return `<article class="entertainment-anime-card" data-subject-id="${escapeHtml(subjectId)}"><a class="entertainment-anime-main" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="entertainment-poster">${entertainmentImage(item)}<i>${rank || String(index + 1).padStart(2, "0")}</i></div><div class="entertainment-copy"><strong>${escapeHtml(item.title)}</strong><span>${score ? `评分 ${score.toFixed(1)}` : "暂无评分"}${airLabel ? ` · ${escapeHtml(airLabel)}` : ""}</span><small>${escapeHtml(item.summary || (state.animeMode === "completed" ? "Bangumi 完结番条目" : "Bangumi 放送中新番"))}</small></div></a>${subjectId ? `<button class="bangumi-comments-button" type="button" data-bangumi-comments>高赞评论</button><div class="bangumi-comments" data-comments-container hidden></div>` : ""}</article>`;
   }).join("");
+  const nowYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: nowYear - 2010 + 1 }, (_, index) => nowYear - index).map((year) => `<option value="${year}"${Number(state.animeYear) === year ? " selected" : ""}>${year} 年</option>`).join("");
+  const monthOptions = Array.from({ length: 12 }, (_, index) => index + 1).map((month) => `<option value="${month}"${Number(state.animeMonth) === month ? " selected" : ""}>${month} 月</option>`).join("");
+  const modeControls = `<div class="entertainment-mode-controls"><div class="entertainment-mode-tabs" role="tablist" aria-label="番剧范围"><button type="button" class="${state.animeMode === "airing" ? "is-active" : ""}" data-anime-mode="airing">放送中</button><button type="button" class="${state.animeMode === "completed" ? "is-active" : ""}" data-anime-mode="completed">完结番</button></div>${state.animeMode === "completed" ? `<label>年份<select id="bangumi-year">${yearOptions}</select></label><label>月份<select id="bangumi-month">${monthOptions}</select></label>` : ""}</div>`;
   const linkRows = (list, empty) => list.length ? list.map((item) => `<a class="entertainment-link-row" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><span class="entertainment-link-mark">${escapeHtml(String(item.title || "文").slice(0, 1))}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.summary || "")}</small></span><b>${item.sample ? "示例" : "打开"} ↗</b></a>`).join("") : `<p class="entertainment-empty">${empty}</p>`;
+  const animeContent = state.animeLoading
+    ? `<p class="entertainment-empty">正在加载 ${state.animeYear} 年 ${state.animeMonth} 月番剧…</p>`
+    : state.animeError
+      ? `<p class="entertainment-empty">${escapeHtml(state.animeError)}</p>`
+      : animeRows || `<p class="entertainment-empty">${state.animeMode === "completed" ? `${state.animeYear} 年 ${state.animeMonth} 月暂无番剧条目。` : "Bangumi 暂时没有返回放送中的新番。"}</p>`;
   grid.innerHTML = `<div class="entertainment-board">
     <section class="entertainment-feature">
-      <div class="entertainment-head"><span>番剧评分</span><a href="https://bgm.tv/anime" target="_blank" rel="noreferrer">打开 Bangumi ↗</a></div>
-      ${animeRows ? `<div class="entertainment-anime-grid">${animeRows}</div>` : `<p class="entertainment-empty">Bangumi 暂时没有返回番剧条目。</p>`}
+      <div class="entertainment-head"><span>${state.animeMode === "completed" ? "完结番评分" : "放送中新番"}</span><a href="https://bgm.tv/anime" target="_blank" rel="noreferrer">打开 Bangumi ↗</a></div>
+      ${modeControls}
+      ${animeRows && !state.animeLoading && !state.animeError ? `<div class="entertainment-anime-grid">${animeRows}</div>` : animeContent}
     </section>
     <section class="entertainment-list-section"><div class="entertainment-head"><span>红果短剧热榜</span><span>短剧</span></div>${linkRows(shortDrama, "红果暂无稳定公开榜单接口，先保留官方入口。")}</section>
     <section class="entertainment-list-section"><div class="entertainment-head"><span>小说榜单</span><span>起点</span></div>${linkRows(novels, "小说榜单接口待接入，先保留公开榜单入口。")}</section>
   </div>`;
+  bindEntertainmentEvents();
+}
+
+function bindEntertainmentEvents() {
+  $$('[data-anime-mode]').forEach((button) => button.addEventListener("click", () => {
+    const mode = button.dataset.animeMode;
+    state.animeMode = mode;
+    state.animeError = "";
+    if (mode === "airing") {
+      state.animeLoading = false;
+      replaceBangumiItems(state.bangumiAiringItems);
+    } else {
+      loadBangumiCompleted();
+    }
+  }));
+  $("#bangumi-year")?.addEventListener("change", (event) => {
+    state.animeYear = Number(event.target.value);
+    loadBangumiCompleted();
+  });
+  $("#bangumi-month")?.addEventListener("change", (event) => {
+    state.animeMonth = Number(event.target.value);
+    loadBangumiCompleted();
+  });
+  $$('[data-bangumi-comments]').forEach((button) => button.addEventListener("click", loadBangumiComments));
+}
+
+function replaceBangumiItems(items) {
+  state.items = state.items.filter((item) => item.source_id !== "bangumi-anime").concat(items || []);
+  if (state.payload) state.payload.items = state.items;
+  renderSourceFilters();
+  renderCounts();
+  renderCards();
+}
+
+async function loadBangumiCompleted() {
+  state.animeMode = "completed";
+  state.animeLoading = true;
+  state.animeError = "";
+  const requestId = ++state.bangumiRequestId;
+  replaceBangumiItems([]);
+  try {
+    const response = await fetch(`/api/bangumi?mode=completed&year=${encodeURIComponent(state.animeYear)}&month=${encodeURIComponent(state.animeMonth)}`, { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    if (requestId !== state.bangumiRequestId) return;
+    state.bangumiCompletedItems = Array.isArray(payload.items) ? payload.items : [];
+  } catch (error) {
+    if (requestId !== state.bangumiRequestId) return;
+    state.bangumiCompletedItems = [];
+    state.animeError = `完结番加载失败：${error.message || "Bangumi 接口暂不可用"}`;
+  } finally {
+    if (requestId === state.bangumiRequestId) {
+      state.animeLoading = false;
+      replaceBangumiItems(state.bangumiCompletedItems);
+    }
+  }
+}
+
+async function loadBangumiComments(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const button = event.currentTarget;
+  const card = button.closest("[data-subject-id]");
+  const container = card?.querySelector("[data-comments-container]");
+  const subjectId = card?.dataset.subjectId;
+  if (!container || !subjectId) return;
+  if (!container.hidden) {
+    container.hidden = true;
+    button.textContent = "高赞评论";
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "加载评论…";
+  try {
+    const response = await fetch(`/api/bangumi/comments?subject_id=${encodeURIComponent(subjectId)}`, { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    const comments = Array.isArray(payload.comments) ? payload.comments : [];
+    container.innerHTML = comments.length
+      ? comments.map((comment) => `<blockquote><p>${escapeHtml(comment.content)}</p><footer>${escapeHtml(comment.user || "匿名用户")} · 赞 ${Number(comment.likes || 0).toLocaleString("zh-CN")}</footer></blockquote>`).join("")
+      : `<p>暂无可展示的高赞评论。</p>`;
+  } catch (error) {
+    container.innerHTML = `<p>评论暂不可用：${escapeHtml(error.message || "接口失败")}</p>`;
+  } finally {
+    container.hidden = false;
+    button.disabled = false;
+    button.textContent = "收起评论";
+  }
 }
 
 function renderCounts() {
@@ -660,6 +769,11 @@ async function loadData(force = false) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     state.payload = await response.json();
     state.items = state.payload.items || [];
+    state.animeMode = "airing";
+    state.animeLoading = false;
+    state.animeError = "";
+    state.bangumiAiringItems = state.items.filter((item) => item.source_id === "bangumi-anime");
+    state.bangumiCompletedItems = [];
     renderSourceFilters();
     renderCounts();
     renderCards();

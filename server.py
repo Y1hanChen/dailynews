@@ -620,7 +620,14 @@ def parse_date(value: str | int | float | None) -> str:
         return datetime.now(timezone.utc).isoformat()
 
 
-def fetch_bytes(url: str, accept: str, timeout: float = 15, extra_headers: dict[str, str] | None = None) -> bytes:
+def fetch_bytes(
+    url: str,
+    accept: str,
+    timeout: float = 15,
+    extra_headers: dict[str, str] | None = None,
+    method: str = "GET",
+    body: bytes | None = None,
+) -> bytes:
     headers = {
         "User-Agent": USER_AGENT,
         "Accept": accept,
@@ -628,10 +635,7 @@ def fetch_bytes(url: str, accept: str, timeout: float = 15, extra_headers: dict[
     }
     if extra_headers:
         headers.update(extra_headers)
-    request = Request(
-        url,
-        headers=headers,
-    )
+    request = Request(url, data=body, headers=headers, method=method)
     with urlopen(request, timeout=timeout) as response:
         return response.read()
 
@@ -695,22 +699,7 @@ def parse_zhihu(raw: bytes, config: dict) -> list[dict]:
     return items
 
 
-def parse_bangumi_calendar(raw: bytes, config: dict) -> list[dict]:
-    payload = json.loads(raw.decode("utf-8"))
-    entries: list[tuple[dict, str]] = []
-    if isinstance(payload, list):
-        for day in payload:
-            if not isinstance(day, dict):
-                continue
-            weekday = day.get("weekday") if isinstance(day.get("weekday"), dict) else {}
-            weekday_label = str(weekday.get("cn") or weekday.get("en") or "")
-            for entry in day.get("items", []) if isinstance(day.get("items"), list) else []:
-                if isinstance(entry, dict):
-                    entries.append((entry, weekday_label))
-    elif isinstance(payload, dict):
-        for entry in payload.get("data", []) if isinstance(payload.get("data"), list) else []:
-            if isinstance(entry, dict):
-                entries.append((entry, ""))
+def _parse_bangumi_entries(entries: list[tuple[dict, str]], config: dict, airing_state: str) -> list[dict]:
     items: list[dict] = []
     seen_ids: set[str] = set()
     for entry, weekday_label in entries:
@@ -731,8 +720,10 @@ def parse_bangumi_calendar(raw: bytes, config: dict) -> list[dict]:
             continue
         seen_ids.add(subject_key)
         title = str(entry.get("name_cn") or entry.get("name") or "未命名番剧").strip()
-        summary = strip_html(entry.get("summary"), 240) or "Bangumi 放送中新番"
+        fallback_summary = "Bangumi 放送中新番" if airing_state == "airing" else "Bangumi 完结番条目"
+        summary = strip_html(entry.get("summary"), 240) or fallback_summary
         images = entry.get("images") if isinstance(entry.get("images"), dict) else {}
+        air_date = entry.get("air_date") or entry.get("date") or ""
         items.append(
             {
                 "id": f"{config['id']}-{subject_id}",
@@ -742,20 +733,139 @@ def parse_bangumi_calendar(raw: bytes, config: dict) -> list[dict]:
                 "section": config["section"],
                 "category": "文娱",
                 "entertainment_kind": "anime",
+                "airing_state": airing_state,
+                "subject_id": str(subject_id),
                 "title": title,
                 "summary": summary,
                 "url": entry.get("url") or f"https://bgm.tv/subject/{subject_id}",
-                "published_at": parse_date(entry.get("air_date") or entry.get("date")),
+                "published_at": parse_date(air_date),
                 "heat": score * 10,
                 "metrics": {"评分": score, "排名": rank} if rank else {"评分": score},
                 "score": score,
                 "rank": rank,
-                "air_date": entry.get("air_date") or entry.get("date") or "",
+                "air_date": air_date,
                 "air_weekday": weekday_label,
                 "image_url": images.get("large") or images.get("common") or images.get("medium") or "",
             }
         )
     return items
+
+
+def parse_bangumi_calendar(raw: bytes, config: dict) -> list[dict]:
+    payload = json.loads(raw.decode("utf-8"))
+    entries: list[tuple[dict, str]] = []
+    if isinstance(payload, list):
+        for day in payload:
+            if not isinstance(day, dict):
+                continue
+            weekday = day.get("weekday") if isinstance(day.get("weekday"), dict) else {}
+            weekday_label = str(weekday.get("cn") or weekday.get("en") or "")
+            for entry in day.get("items", []) if isinstance(day.get("items"), list) else []:
+                if isinstance(entry, dict):
+                    entries.append((entry, weekday_label))
+    elif isinstance(payload, dict):
+        for entry in payload.get("data", []) if isinstance(payload.get("data"), list) else []:
+            if isinstance(entry, dict):
+                entries.append((entry, ""))
+    return _parse_bangumi_entries(entries, config, "airing")
+
+
+def parse_bangumi_search(raw: bytes, config: dict) -> list[dict]:
+    payload = json.loads(raw.decode("utf-8"))
+    entries = payload.get("data", []) if isinstance(payload, dict) else []
+    normalized = [(entry, "") for entry in entries if isinstance(entry, dict)]
+    return _parse_bangumi_entries(normalized, config, "completed")
+
+
+def _bangumi_comment_entries(payload: object) -> list[dict]:
+    if isinstance(payload, dict):
+        entries = payload.get("data") or payload.get("comments") or payload.get("posts") or []
+    else:
+        entries = payload
+    return [entry for entry in entries if isinstance(entry, dict)] if isinstance(entries, list) else []
+
+
+def parse_bangumi_comments(raw: bytes) -> list[dict]:
+    payload = json.loads(raw.decode("utf-8"))
+    comments: list[dict] = []
+    for entry in _bangumi_comment_entries(payload):
+        content = strip_html(entry.get("content") or entry.get("comment") or entry.get("text"), 220)
+        if not content:
+            continue
+        user = entry.get("user") or entry.get("creator") or {}
+        if isinstance(user, dict):
+            user_name = str(user.get("nickname") or user.get("username") or user.get("name") or "匿名用户")
+        else:
+            user_name = str(user or "匿名用户")
+        likes = 0
+        for key in ("likes", "like", "votes", "up", "useful", "useful_count"):
+            try:
+                likes = int(entry.get(key) or 0)
+            except (TypeError, ValueError):
+                likes = 0
+            if likes:
+                break
+        comments.append({"content": content, "user": user_name, "likes": likes})
+    comments.sort(key=lambda item: (-item["likes"], item["content"]))
+    return comments[:3]
+
+
+def fetch_bangumi_completed(year: int, month: int, config: dict) -> list[dict]:
+    cache_key = f"{year:04d}-{month:02d}"
+    cached = bangumi_completed_cache.get(cache_key)
+    now = time()
+    if cached and now - cached[0] < CACHE_TTL_SECONDS:
+        return cached[1]
+    last_day = 28
+    while True:
+        try:
+            datetime(year, month, last_day + 1)
+            last_day += 1
+        except ValueError:
+            break
+    start = f"{year:04d}-{month:02d}-01"
+    end = f"{year:04d}-{month:02d}-{last_day:02d}"
+    body = json.dumps(
+        {
+            "sort": "rank",
+            "limit": 30,
+            "offset": 0,
+            "filter": {"type": [2], "air_date": [f">={start}", f"<={end}"], "nsfw": False},
+        }
+    ).encode("utf-8")
+    raw = fetch_bytes(
+        "https://api.bgm.tv/v0/search/subjects",
+        "application/json, text/plain;q=0.9",
+        extra_headers={"Content-Type": "application/json"},
+        method="POST",
+        body=body,
+    )
+    items = parse_bangumi_search(raw, config)
+    bangumi_completed_cache[cache_key] = (now, items)
+    return items
+
+
+def fetch_bangumi_comments(subject_id: str) -> list[dict]:
+    cached = bangumi_comments_cache.get(subject_id)
+    now = time()
+    if cached and now - cached[0] < CACHE_TTL_SECONDS * 2:
+        return cached[1]
+    errors: list[str] = []
+    urls = (
+        f"https://api.bgm.tv/p1/subject/{subject_id}/comments?limit=20&offset=0",
+        f"https://api.bgm.tv/v0/subjects/{subject_id}/posts?limit=20&offset=0",
+    )
+    for url in urls:
+        try:
+            raw = fetch_bytes(url, "application/json, text/plain;q=0.9")
+            comments = parse_bangumi_comments(raw)
+            if comments:
+                bangumi_comments_cache[subject_id] = (now, comments)
+                return comments
+            errors.append("empty response")
+        except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError) as exc:
+            errors.append(str(exc)[:100])
+    raise ValueError("Bangumi 评论接口不可用：" + "; ".join(errors)[:300])
 
 
 MARKET_NAMES = {
@@ -1307,6 +1417,8 @@ def save_disk_cache(cache: dict) -> None:
 
 cache_lock = threading.Lock()
 memory_cache: dict | None = None
+bangumi_completed_cache: dict[str, tuple[float, list[dict]]] = {}
+bangumi_comments_cache: dict[str, tuple[float, list[dict]]] = {}
 
 
 def build_payload(force: bool = False) -> dict:
@@ -1485,11 +1597,48 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/health":
             self.send_json({"ok": True, "service": "daily-board"})
             return
+        if parsed.path == "/api/bangumi":
+            query = parse_qs(parsed.query)
+            mode = query.get("mode", ["airing"])[0]
+            if mode != "completed":
+                self.send_json({"error": "unsupported Bangumi mode"}, status=400)
+                return
+            try:
+                year = int(query.get("year", [str(datetime.now(timezone.utc).year)])[0])
+                month = int(query.get("month", [str(datetime.now(timezone.utc).month)])[0])
+            except (TypeError, ValueError):
+                self.send_json({"error": "year and month must be numbers"}, status=400)
+                return
+            current_year = datetime.now(timezone.utc).year
+            if year < 2000 or year > current_year or month < 1 or month > 12:
+                self.send_json({"error": "year or month is out of range"}, status=400)
+                return
+            config = next(item for item in SOURCE_CONFIG if item["id"] == "bangumi-anime")
+            try:
+                items = fetch_bangumi_completed(year, month, config)
+            except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError) as exc:
+                self.send_json({"error": str(exc)[:300]}, status=502)
+                return
+            self.send_json({"items": items, "year": year, "month": month, "fetched_at": datetime.now(timezone.utc).isoformat()})
+            return
+        if parsed.path == "/api/bangumi/comments":
+            query = parse_qs(parsed.query)
+            subject_id = str(query.get("subject_id", [""])[0]).strip()
+            if not re.fullmatch(r"\d+", subject_id):
+                self.send_json({"error": "subject_id must be numeric"}, status=400)
+                return
+            try:
+                comments = fetch_bangumi_comments(subject_id)
+            except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError) as exc:
+                self.send_json({"error": str(exc)[:300]}, status=502)
+                return
+            self.send_json({"subject_id": subject_id, "comments": comments})
+            return
         self.send_static(parsed.path)
 
-    def send_json(self, payload: dict) -> None:
+    def send_json(self, payload: dict, status: int = 200) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
