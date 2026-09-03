@@ -555,6 +555,76 @@ function animeRegionOf(item) {
   return /[\u3040-\u30ff]/.test(originalTitle) ? "jp" : "unknown";
 }
 
+const jikanSeasonNames = { 1: "winter", 4: "spring", 7: "summer", 10: "fall" };
+
+function jikanSeasonUrl(year, month) {
+  const season = jikanSeasonNames[Number(month)];
+  return season ? `https://api.jikan.moe/v4/seasons/${encodeURIComponent(year)}/${season}?sfw=true&limit=60` : "";
+}
+
+function parseJikanItems(payload, airingState) {
+  const entries = Array.isArray(payload?.data) ? payload.data : [];
+  return entries
+    .filter((entry) => entry && (airingState !== "completed" || entry.status === "Finished Airing"))
+    .filter((entry) => airingState !== "airing" || entry.status !== "Finished Airing")
+    .map((entry) => {
+      const aired = entry.aired && typeof entry.aired === "object" ? entry.aired : {};
+      const images = entry.images && typeof entry.images === "object" ? entry.images : {};
+      const jpg = images.jpg && typeof images.jpg === "object" ? images.jpg : {};
+      const score = Number(entry.score || 0);
+      const rank = Number(entry.rank || 0);
+      const title = String(entry.title || entry.title_english || "未命名番剧").trim();
+      return {
+        id: `bangumi-anime-jikan-${entry.mal_id || title}`,
+        source_id: "bangumi-anime",
+        source: "Bangumi 番剧 · Jikan 备用",
+        tone: "coral",
+        section: "entertainment",
+        category: "文娱",
+        entertainment_kind: "anime",
+        airing_state: airingState,
+        title,
+        original_title: String(entry.title_japanese || title),
+        summary: String(entry.synopsis || (airingState === "completed" ? "Jikan 完结番条目" : "Jikan 当季番条目")),
+        url: String(entry.url || "https://myanimelist.net/anime/" + (entry.mal_id || "")),
+        published_at: String(aired.from || new Date().toISOString()),
+        heat: score * 10,
+        metrics: rank ? { "评分": score, "排名": rank } : { "评分": score },
+        score,
+        rank,
+        region: entry.title_japanese ? "jp" : "unknown",
+        region_label: entry.title_japanese ? "日本动画" : "地区未标注",
+        region_source: "Jikan 元数据",
+        air_date: String(aired.from || "").slice(0, 10),
+        air_weekday: "",
+        image_url: String(jpg.large_image_url || jpg.image_url || ""),
+        fallback: true,
+      };
+    });
+}
+
+async function fetchJikanItems(url, airingState) {
+  if (!url) throw new Error("Jikan 季度地址无效");
+  const response = await fetch(url, { cache: "no-store" });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload?.message || `Jikan HTTP ${response.status}`);
+  return parseJikanItems(payload, airingState);
+}
+
+async function loadBangumiBrowserFallback() {
+  if (state.bangumiAiringItems.length) return;
+  try {
+    const items = await fetchJikanItems("https://api.jikan.moe/v4/seasons/now?sfw=true&limit=60", "airing");
+    if (!items.length || state.animeMode !== "airing") return;
+    state.bangumiAiringItems = items;
+    if (state.animeRegion === "jp" && !items.some((item) => animeRegionOf(item) === "jp")) state.animeRegion = "all";
+    replaceBangumiItems(items);
+    updateBangumiStatus("fallback", items.length, "服务器无法访问 Bangumi，已由浏览器直连 Jikan");
+  } catch (error) {
+    console.warn("Bangumi browser fallback unavailable", error);
+  }
+}
+
 function renderEntertainment(items) {
   const grid = $("#feed-grid");
   const allAnime = items.filter((item) => item.entertainment_kind === "anime");
@@ -608,6 +678,7 @@ function bindEntertainmentEvents() {
     state.animeMode = mode;
     state.animeError = "";
     if (mode === "airing") {
+      state.bangumiRequestId += 1;
       state.animeLoading = false;
       replaceBangumiItems(state.bangumiAiringItems);
     } else {
@@ -648,15 +719,25 @@ async function loadBangumiCompleted() {
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     if (requestId !== state.bangumiRequestId) return;
     state.bangumiCompletedItems = Array.isArray(payload.items) ? payload.items : [];
+    if (!state.bangumiCompletedItems.length) throw new Error("Bangumi 完结番接口返回空结果");
     if (state.animeRegion === "jp" && state.bangumiCompletedItems.length && !state.bangumiCompletedItems.some((item) => animeRegionOf(item) === "jp")) {
       state.animeRegion = "all";
     }
     updateBangumiStatus(state.bangumiCompletedItems.some((item) => item.fallback) ? "fallback" : "live", state.bangumiCompletedItems.length);
   } catch (error) {
     if (requestId !== state.bangumiRequestId) return;
-    state.bangumiCompletedItems = [];
-    state.animeError = `完结番加载失败：${error.message || "Bangumi 接口暂不可用"}`;
-    updateBangumiStatus("sample", 0, error.message || "Bangumi 接口暂不可用");
+    try {
+      state.bangumiCompletedItems = await fetchJikanItems(jikanSeasonUrl(state.animeYear, state.animeMonth), "completed");
+      if (requestId !== state.bangumiRequestId) return;
+      if (!state.bangumiCompletedItems.length) throw new Error("Jikan 该季度没有已完结条目");
+      state.animeError = "";
+      if (state.animeRegion === "jp" && !state.bangumiCompletedItems.some((item) => animeRegionOf(item) === "jp")) state.animeRegion = "all";
+      updateBangumiStatus("fallback", state.bangumiCompletedItems.length, "服务器无法访问 Bangumi，已由浏览器直连 Jikan");
+    } catch (fallbackError) {
+      state.bangumiCompletedItems = [];
+      state.animeError = `完结番加载失败：${fallbackError.message || error.message || "Bangumi 接口暂不可用"}`;
+      updateBangumiStatus("sample", 0, fallbackError.message || error.message || "Bangumi 接口暂不可用");
+    }
   } finally {
     if (requestId === state.bangumiRequestId) {
       state.animeLoading = false;
@@ -796,6 +877,7 @@ async function loadData(force = false) {
     const stamp = new Date(state.payload.fetched_at);
     $("#last-sync").textContent = `最近同步 ${stamp.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
     setConnectionState(state.payload.statuses || []);
+    if (!state.bangumiAiringItems.length) void loadBangumiBrowserFallback();
   } catch (error) {
     $("#sync-status").textContent = "同步失败";
     $(".live-dot").classList.add("is-error");
