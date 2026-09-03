@@ -157,8 +157,10 @@ SOURCE_CONFIG = [
         "kind": "bangumi_calendar",
         "section": "entertainment",
         "url": "https://api.bgm.tv/v0/calendar",
+        "fallback_url": "https://api.jikan.moe/v4/seasons/now?sfw=true&limit=60",
+        "fallback_base_url": "https://api.jikan.moe/v4/seasons",
         "tone": "coral",
-        "description": "放送中新番、评分与放送日（Bangumi API）",
+        "description": "放送中新番、评分与放送日（Bangumi API；Jikan 备用）",
     },
 ]
 
@@ -804,6 +806,50 @@ def parse_bangumi_search(raw: bytes, config: dict) -> list[dict]:
     return _parse_bangumi_entries(normalized, config, "completed")
 
 
+_JIKAN_SEASONS = {1: "winter", 4: "spring", 7: "summer", 10: "fall"}
+
+
+def parse_jikan_season(raw: bytes, config: dict, airing_state: str) -> list[dict]:
+    """Normalize Jikan's seasonal anime response to the Bangumi item shape."""
+    payload = json.loads(raw.decode("utf-8"))
+    entries = payload.get("data", []) if isinstance(payload, dict) else []
+    normalized: list[tuple[dict, str]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        status = str(entry.get("status") or "")
+        if airing_state == "completed" and status != "Finished Airing":
+            continue
+        if airing_state == "airing" and status == "Finished Airing":
+            continue
+        aired = entry.get("aired") if isinstance(entry.get("aired"), dict) else {}
+        images = entry.get("images") if isinstance(entry.get("images"), dict) else {}
+        jpg = images.get("jpg") if isinstance(images.get("jpg"), dict) else {}
+        title = str(entry.get("title") or entry.get("title_english") or "未命名番剧").strip()
+        aired_from = aired.get("from") or ""
+        normalized.append(
+            (
+                {
+                    "id": entry.get("mal_id") or entry.get("url") or title,
+                    "url": entry.get("url") or "",
+                    "type": 2,
+                    "name": entry.get("title_japanese") or title,
+                    "name_cn": title,
+                    "summary": entry.get("synopsis") or "",
+                    "air_date": str(aired_from)[:10],
+                    "rating": {"score": entry.get("score") or 0, "rank": entry.get("rank") or 0},
+                    "images": {"large": jpg.get("large_image_url") or jpg.get("image_url") or ""},
+                    "meta_tags": ["日本动画"] if entry.get("title_japanese") else [],
+                },
+                "",
+            )
+        )
+    items = _parse_bangumi_entries(normalized, {**config, "name": f"{config['name']} · Jikan 备用"}, airing_state)
+    for item in items:
+        item["fallback"] = True
+    return items
+
+
 def fetch_bangumi_completed(year: int, month: int, config: dict) -> list[dict]:
     if month not in {1, 4, 7, 10}:
         raise ValueError("month must be one of 1, 4, 7 or 10")
@@ -830,14 +876,26 @@ def fetch_bangumi_completed(year: int, month: int, config: dict) -> list[dict]:
             "filter": {"type": [2], "air_date": [f">={start}", f"<={end}"], "nsfw": False},
         }
     ).encode("utf-8")
-    raw = fetch_bytes(
-        "https://api.bgm.tv/v0/search/subjects",
-        "application/json, text/plain;q=0.9",
-        extra_headers={"Content-Type": "application/json"},
-        method="POST",
-        body=body,
-    )
-    items = parse_bangumi_search(raw, config)
+    try:
+        raw = fetch_bytes(
+            "https://api.bgm.tv/v0/search/subjects",
+            "application/json, text/plain;q=0.9",
+            extra_headers={"Content-Type": "application/json"},
+            method="POST",
+            body=body,
+        )
+        items = parse_bangumi_search(raw, config)
+    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError) as primary_error:
+        fallback_base = config.get("fallback_base_url")
+        season = _JIKAN_SEASONS[month]
+        if not fallback_base:
+            raise primary_error
+        fallback_url = f"{fallback_base}/{year}/{season}?sfw=true&limit=60"
+        try:
+            fallback_raw = fetch_bytes(fallback_url, "application/json, text/plain;q=0.9", timeout=12)
+            items = parse_jikan_season(fallback_raw, config, "completed")
+        except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError):
+            raise primary_error
     bangumi_completed_cache[cache_key] = (now, items)
     return items
 MARKET_NAMES = {
@@ -1408,6 +1466,7 @@ def build_payload(force: bool = False) -> dict:
 
         for config in SOURCE_CONFIG:
             source_id = config["id"]
+            used_fallback = False
             if config.get("subsection") == "tft" and not TFT_ENABLED:
                 # Keep the adapter available for later re-enablement, but do
                 # not expose stale or cross-set TFT data in the dashboard.
@@ -1469,8 +1528,16 @@ def build_payload(force: bool = False) -> dict:
                     raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
                     items = parse_nba(raw, config)
                 elif config["kind"] == "bangumi_calendar":
-                    raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
-                    items = parse_bangumi_calendar(raw, config)
+                    try:
+                        raw = fetch_bytes(config["url"], "application/json, text/plain;q=0.9")
+                        items = parse_bangumi_calendar(raw, config)
+                    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError) as primary_error:
+                        fallback_url = config.get("fallback_url")
+                        if not fallback_url:
+                            raise primary_error
+                        fallback_raw = fetch_bytes(fallback_url, "application/json, text/plain;q=0.9", timeout=12)
+                        items = parse_jikan_season(fallback_raw, config, "airing")
+                        used_fallback = True
                 elif config["kind"] == "tft_live_patch":
                     data_items: list[dict] | None = None
                     data_errors: list[Exception] = []
@@ -1522,7 +1589,7 @@ def build_payload(force: bool = False) -> dict:
                 else:
                     items = items[:30]
                 updated_cache["sources"][source_id] = {"items": items, "saved_at": now}
-                statuses.append({"id": source_id, "name": config["short_name"], "state": "live", "count": len(items)})
+                statuses.append({"id": source_id, "name": config["short_name"], "state": "fallback" if used_fallback else "live", "count": len(items)})
             except (HTTPError, URLError, TimeoutError, OSError, ET.ParseError, json.JSONDecodeError, UnicodeError, ValueError) as exc:
                 cached = disk_cache.get("sources", {}).get(source_id, {})
                 items = cached.get("items") or SAMPLE_ITEMS.get(source_id, [])

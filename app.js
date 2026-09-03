@@ -651,7 +651,7 @@ async function loadBangumiCompleted() {
     if (state.animeRegion === "jp" && state.bangumiCompletedItems.length && !state.bangumiCompletedItems.some((item) => animeRegionOf(item) === "jp")) {
       state.animeRegion = "all";
     }
-    updateBangumiStatus("live", state.bangumiCompletedItems.length);
+    updateBangumiStatus(state.bangumiCompletedItems.some((item) => item.fallback) ? "fallback" : "live", state.bangumiCompletedItems.length);
   } catch (error) {
     if (requestId !== state.bangumiRequestId) return;
     state.bangumiCompletedItems = [];
@@ -739,6 +739,7 @@ function renderStatuses(statuses = []) {
   const labels = {
     live: ["实时", "status-live"],
     cached: ["缓存", "status-cached"],
+    fallback: ["备用", "status-cached"],
     sample: ["示例", "status-sample"],
   };
   $("#source-status-list").innerHTML = statuses.map((status) => {
@@ -760,7 +761,7 @@ function updateBangumiStatus(stateName, count, error = "") {
 }
 
 function setConnectionState(statuses = []) {
-  const liveCount = statuses.filter((status) => status.state === "live").length;
+  const liveCount = statuses.filter((status) => ["live", "fallback"].includes(status.state)).length;
   const isBusy = $("#refresh-button").classList.contains("is-busy");
   const dot = $(".live-dot");
   dot.classList.toggle("is-error", liveCount === 0);
