@@ -44,6 +44,7 @@ SOURCE_CONFIG = [
         "short_name": "机器之心",
         "kind": "zhihu",
         "section": "ai",
+        "slug": "jiqizhixin",
         "url": "https://www.zhihu.com/api/v4/columns/jiqizhixin/articles",
         "tone": "teal",
         "description": "中文 AI 文章与论文解读",
@@ -158,26 +159,6 @@ SOURCE_CONFIG = [
         "url": "https://api.bgm.tv/v0/calendar",
         "tone": "coral",
         "description": "放送中新番、评分与放送日（Bangumi API）",
-    },
-    {
-        "id": "hongguo-short-drama",
-        "name": "红果短剧 · 热榜",
-        "short_name": "红果短剧",
-        "kind": "sample",
-        "section": "entertainment",
-        "url": "https://www.hongguoduanju.com/",
-        "tone": "yellow",
-        "description": "红果短剧热榜（暂未发现稳定公开接口）",
-    },
-    {
-        "id": "novel-rankings",
-        "name": "小说榜单 · 起点",
-        "short_name": "小说榜单",
-        "kind": "sample",
-        "section": "entertainment",
-        "url": "https://www.qidian.com/rank/",
-        "tone": "teal",
-        "description": "网络小说榜单入口（暂用公开页面）",
     },
 ]
 
@@ -479,42 +460,6 @@ SAMPLE_ITEMS = {
             "sample": True,
         },
     ],
-    "hongguo-short-drama": [
-        {
-            "id": "sample-hongguo-short-drama",
-            "source_id": "hongguo-short-drama",
-            "source": "红果短剧 · 热榜",
-            "tone": "yellow",
-            "section": "entertainment",
-            "category": "文娱",
-            "entertainment_kind": "short-drama",
-            "title": "红果短剧热榜",
-            "summary": "红果暂未提供稳定的公开榜单接口，点击来源可查看官方内容。",
-            "url": "https://www.hongguoduanju.com/",
-            "published_at": "2026-09-01T08:00:00+00:00",
-            "heat": 0,
-            "metrics": {},
-            "sample": True,
-        },
-    ],
-    "novel-rankings": [
-        {
-            "id": "sample-novel-rankings",
-            "source_id": "novel-rankings",
-            "source": "小说榜单 · 起点",
-            "tone": "teal",
-            "section": "entertainment",
-            "category": "文娱",
-            "entertainment_kind": "novel",
-            "title": "起点中文网小说榜单",
-            "summary": "当前先提供公开榜单入口；站内排名接口需要后续适配和低频缓存。",
-            "url": "https://www.qidian.com/rank/",
-            "published_at": "2026-09-01T08:00:00+00:00",
-            "heat": 0,
-            "metrics": {},
-            "sample": True,
-        },
-    ],
     "tft-riot-version": [
         {
             "id": "sample-tft-version",
@@ -699,6 +644,72 @@ def parse_zhihu(raw: bytes, config: dict) -> list[dict]:
     return items
 
 
+_BANGUMI_REGION_LABELS = {
+    "jp": "日本动画",
+    "cn": "中国动画",
+    "other": "其他地区",
+    "unknown": "地区未标注",
+}
+_BANGUMI_REGION_ORDER = {"jp": 0, "other": 1, "unknown": 2, "cn": 3}
+
+
+def _bangumi_region(entry: dict) -> tuple[str, str]:
+    """Infer the production region from Bangumi metadata without extra requests."""
+    metadata: list[str] = []
+
+    def add_value(value: object) -> None:
+        if isinstance(value, dict):
+            metadata.extend(str(value.get(name) or "") for name in ("name", "title", "value", "v"))
+        elif value:
+            metadata.append(str(value))
+
+    for key in ("meta_tags", "tags", "genres"):
+        value = entry.get(key)
+        if isinstance(value, (list, tuple)):
+            for tag in value:
+                add_value(tag)
+        elif isinstance(value, dict):
+            for tag in value.values():
+                add_value(tag)
+        elif isinstance(value, str):
+            metadata.append(value)
+    infobox = entry.get("infobox")
+    if isinstance(infobox, list):
+        for field in infobox:
+            if not isinstance(field, dict):
+                continue
+            key = str(field.get("key") or "").strip().lower()
+            if key in {"地区", "国家", "国籍", "region", "country"}:
+                value = field.get("value")
+                if isinstance(value, list):
+                    metadata.extend(str(part.get("v") or part.get("value") or part) if isinstance(part, dict) else str(part) for part in value)
+                elif value:
+                    metadata.append(str(value))
+    elif isinstance(infobox, dict):
+        for field_key, value in infobox.items():
+            if str(field_key).strip().lower() in {"地区", "国家", "国籍", "region", "country"}:
+                if isinstance(value, list):
+                    for part in value:
+                        add_value(part)
+                else:
+                    add_value(value)
+    normalized = " ".join(metadata).lower()
+    if re.search(r"日本动画|日本动漫|日漫|日本|japanese|\bjapan\b", normalized):
+        return "jp", "Bangumi 地区标签"
+    if re.search(r"中国动画|中国动漫|国漫|国产动画|中国|chinese|\bchina\b", normalized):
+        return "cn", "Bangumi 地区标签"
+    if re.search(r"韩国动画|韩国动漫|korean|\bkorea\b", normalized):
+        return "other", "Bangumi 地区标签"
+
+    # The calendar often omits infobox/meta tags. The original title is still
+    # useful: Japanese kana reliably distinguishes Japanese productions from
+    # Chinese-localized titles, including entries such as Re:Zero.
+    original_title = str(entry.get("name") or "")
+    if re.search(r"[\u3040-\u30ff]", original_title):
+        return "jp", "原名日文字符"
+    return "unknown", "未提供地区信息"
+
+
 def _parse_bangumi_entries(entries: list[tuple[dict, str]], config: dict, airing_state: str) -> list[dict]:
     items: list[dict] = []
     seen_ids: set[str] = set()
@@ -720,6 +731,8 @@ def _parse_bangumi_entries(entries: list[tuple[dict, str]], config: dict, airing
             continue
         seen_ids.add(subject_key)
         title = str(entry.get("name_cn") or entry.get("name") or "未命名番剧").strip()
+        original_title = str(entry.get("name") or "").strip()
+        region, region_source = _bangumi_region(entry)
         fallback_summary = "Bangumi 放送中新番" if airing_state == "airing" else "Bangumi 完结番条目"
         summary = strip_html(entry.get("summary"), 240) or fallback_summary
         images = entry.get("images") if isinstance(entry.get("images"), dict) else {}
@@ -736,6 +749,7 @@ def _parse_bangumi_entries(entries: list[tuple[dict, str]], config: dict, airing
                 "airing_state": airing_state,
                 "subject_id": str(subject_id),
                 "title": title,
+                "original_title": original_title,
                 "summary": summary,
                 "url": entry.get("url") or f"https://bgm.tv/subject/{subject_id}",
                 "published_at": parse_date(air_date),
@@ -743,6 +757,9 @@ def _parse_bangumi_entries(entries: list[tuple[dict, str]], config: dict, airing
                 "metrics": {"评分": score, "排名": rank} if rank else {"评分": score},
                 "score": score,
                 "rank": rank,
+                "region": region,
+                "region_label": _BANGUMI_REGION_LABELS[region],
+                "region_source": region_source,
                 "air_date": air_date,
                 "air_weekday": weekday_label,
                 "image_url": images.get("large") or images.get("common") or images.get("medium") or "",
@@ -767,7 +784,17 @@ def parse_bangumi_calendar(raw: bytes, config: dict) -> list[dict]:
         for entry in payload.get("data", []) if isinstance(payload.get("data"), list) else []:
             if isinstance(entry, dict):
                 entries.append((entry, ""))
-    return _parse_bangumi_entries(entries, config, "airing")
+    items = _parse_bangumi_entries(entries, config, "airing")
+    items.sort(
+        key=lambda item: (
+            _BANGUMI_REGION_ORDER.get(item.get("region", "unknown"), 2),
+            -float(item.get("score") or 0),
+            item.get("rank") == 0,
+            item.get("rank") or 999999,
+            item.get("air_date") or "",
+        )
+    )
+    return items
 
 
 def parse_bangumi_search(raw: bytes, config: dict) -> list[dict]:
@@ -777,54 +804,24 @@ def parse_bangumi_search(raw: bytes, config: dict) -> list[dict]:
     return _parse_bangumi_entries(normalized, config, "completed")
 
 
-def _bangumi_comment_entries(payload: object) -> list[dict]:
-    if isinstance(payload, dict):
-        entries = payload.get("data") or payload.get("comments") or payload.get("posts") or []
-    else:
-        entries = payload
-    return [entry for entry in entries if isinstance(entry, dict)] if isinstance(entries, list) else []
-
-
-def parse_bangumi_comments(raw: bytes) -> list[dict]:
-    payload = json.loads(raw.decode("utf-8"))
-    comments: list[dict] = []
-    for entry in _bangumi_comment_entries(payload):
-        content = strip_html(entry.get("content") or entry.get("comment") or entry.get("text"), 220)
-        if not content:
-            continue
-        user = entry.get("user") or entry.get("creator") or {}
-        if isinstance(user, dict):
-            user_name = str(user.get("nickname") or user.get("username") or user.get("name") or "匿名用户")
-        else:
-            user_name = str(user or "匿名用户")
-        likes = 0
-        for key in ("likes", "like", "votes", "up", "useful", "useful_count"):
-            try:
-                likes = int(entry.get(key) or 0)
-            except (TypeError, ValueError):
-                likes = 0
-            if likes:
-                break
-        comments.append({"content": content, "user": user_name, "likes": likes})
-    comments.sort(key=lambda item: (-item["likes"], item["content"]))
-    return comments[:3]
-
-
 def fetch_bangumi_completed(year: int, month: int, config: dict) -> list[dict]:
+    if month not in {1, 4, 7, 10}:
+        raise ValueError("month must be one of 1, 4, 7 or 10")
     cache_key = f"{year:04d}-{month:02d}"
     cached = bangumi_completed_cache.get(cache_key)
     now = time()
     if cached and now - cached[0] < CACHE_TTL_SECONDS:
         return cached[1]
+    end_month = month + 2
     last_day = 28
     while True:
         try:
-            datetime(year, month, last_day + 1)
+            datetime(year, end_month, last_day + 1)
             last_day += 1
         except ValueError:
             break
     start = f"{year:04d}-{month:02d}-01"
-    end = f"{year:04d}-{month:02d}-{last_day:02d}"
+    end = f"{year:04d}-{end_month:02d}-{last_day:02d}"
     body = json.dumps(
         {
             "sort": "rank",
@@ -843,31 +840,6 @@ def fetch_bangumi_completed(year: int, month: int, config: dict) -> list[dict]:
     items = parse_bangumi_search(raw, config)
     bangumi_completed_cache[cache_key] = (now, items)
     return items
-
-
-def fetch_bangumi_comments(subject_id: str) -> list[dict]:
-    cached = bangumi_comments_cache.get(subject_id)
-    now = time()
-    if cached and now - cached[0] < CACHE_TTL_SECONDS * 2:
-        return cached[1]
-    errors: list[str] = []
-    urls = (
-        f"https://api.bgm.tv/p1/subject/{subject_id}/comments?limit=20&offset=0",
-        f"https://api.bgm.tv/v0/subjects/{subject_id}/posts?limit=20&offset=0",
-    )
-    for url in urls:
-        try:
-            raw = fetch_bytes(url, "application/json, text/plain;q=0.9")
-            comments = parse_bangumi_comments(raw)
-            if comments:
-                bangumi_comments_cache[subject_id] = (now, comments)
-                return comments
-            errors.append("empty response")
-        except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError) as exc:
-            errors.append(str(exc)[:100])
-    raise ValueError("Bangumi 评论接口不可用：" + "; ".join(errors)[:300])
-
-
 MARKET_NAMES = {
     "sh000001": "上证指数",
     "sz399001": "深证成指",
@@ -1418,7 +1390,6 @@ def save_disk_cache(cache: dict) -> None:
 cache_lock = threading.Lock()
 memory_cache: dict | None = None
 bangumi_completed_cache: dict[str, tuple[float, list[dict]]] = {}
-bangumi_comments_cache: dict[str, tuple[float, list[dict]]] = {}
 
 
 def build_payload(force: bool = False) -> dict:
@@ -1543,13 +1514,24 @@ def build_payload(force: bool = False) -> dict:
                     raise ValueError("sample-only source")
                 else:
                     items = []
-                items = items[:60] if config["kind"] == "eastmoney" else items[:30]
+                if config["kind"] in {"eastmoney", "bangumi_calendar"}:
+                    # Keep a wider calendar window so a region filter can show
+                    # Japanese seasonal titles even when long-running Chinese
+                    # animation occupies the first page of Bangumi results.
+                    items = items[:60]
+                else:
+                    items = items[:30]
                 updated_cache["sources"][source_id] = {"items": items, "saved_at": now}
                 statuses.append({"id": source_id, "name": config["short_name"], "state": "live", "count": len(items)})
             except (HTTPError, URLError, TimeoutError, OSError, ET.ParseError, json.JSONDecodeError, UnicodeError, ValueError) as exc:
                 cached = disk_cache.get("sources", {}).get(source_id, {})
                 items = cached.get("items") or SAMPLE_ITEMS.get(source_id, [])
-                state = "cached" if cached.get("items") else "sample"
+                # Older dashboard versions cached Bangumi's historical ranking
+                # response. It has no airing state and must not be presented as
+                # today's calendar when the live endpoint is unavailable.
+                if source_id == "bangumi-anime" and items and any(not item.get("airing_state") for item in items if isinstance(item, dict)):
+                    items = []
+                state = "cached" if cached.get("items") and items else "sample"
                 statuses.append(
                     {
                         "id": source_id,
@@ -1605,12 +1587,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 return
             try:
                 year = int(query.get("year", [str(datetime.now(timezone.utc).year)])[0])
-                month = int(query.get("month", [str(datetime.now(timezone.utc).month)])[0])
+                current_month = datetime.now(timezone.utc).month
+                current_season = ((current_month - 1) // 3) * 3 + 1
+                month = int(query.get("month", [str(current_season)])[0])
             except (TypeError, ValueError):
                 self.send_json({"error": "year and month must be numbers"}, status=400)
                 return
             current_year = datetime.now(timezone.utc).year
-            if year < 2000 or year > current_year or month < 1 or month > 12:
+            if year < 2000 or year > current_year or month not in {1, 4, 7, 10}:
                 self.send_json({"error": "year or month is out of range"}, status=400)
                 return
             config = next(item for item in SOURCE_CONFIG if item["id"] == "bangumi-anime")
@@ -1620,19 +1604,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(exc)[:300]}, status=502)
                 return
             self.send_json({"items": items, "year": year, "month": month, "fetched_at": datetime.now(timezone.utc).isoformat()})
-            return
-        if parsed.path == "/api/bangumi/comments":
-            query = parse_qs(parsed.query)
-            subject_id = str(query.get("subject_id", [""])[0]).strip()
-            if not re.fullmatch(r"\d+", subject_id):
-                self.send_json({"error": "subject_id must be numeric"}, status=400)
-                return
-            try:
-                comments = fetch_bangumi_comments(subject_id)
-            except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeError, ValueError) as exc:
-                self.send_json({"error": str(exc)[:300]}, status=502)
-                return
-            self.send_json({"subject_id": subject_id, "comments": comments})
             return
         self.send_static(parsed.path)
 

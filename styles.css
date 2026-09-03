@@ -220,7 +220,7 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .steam-open:hover { color: var(--ink); }
 .steam-note { padding: 0 20px 16px; }
 .entertainment-board { display: grid; grid-column: 1 / -1; gap: 12px; }
-.entertainment-feature, .entertainment-list-section { border-top: 2px solid var(--ink); background: var(--card); }
+.entertainment-feature { border-top: 2px solid var(--ink); background: var(--card); }
 .entertainment-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 20px 13px; background: var(--paper-deep); color: var(--ink); font-size: 13px; font-weight: 700; }
 .entertainment-head a { color: var(--muted); font-size: 11px; font-weight: 500; text-decoration: none; }
 .entertainment-head a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
@@ -230,6 +230,11 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .entertainment-mode-tabs button:last-child { border-right: 0; }
 .entertainment-mode-tabs button:hover { color: var(--ink); background: var(--card); }
 .entertainment-mode-tabs button.is-active { background: var(--ink); color: var(--paper); }
+.entertainment-region-tabs { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 10px 20px 0; }
+.entertainment-region-tabs button { border: 1px solid var(--line); padding: 5px 9px; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; }
+.entertainment-region-tabs button:hover { border-color: var(--line-strong); color: var(--ink); background: var(--card); }
+.entertainment-region-tabs button.is-active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.entertainment-region-tabs button span { margin-left: 3px; opacity: .7; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .entertainment-mode-controls label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
 .entertainment-mode-controls select { height: 30px; padding: 0 23px 0 7px; font-size: 11px; }
 .entertainment-anime-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 20px 20px; }
@@ -244,20 +249,6 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
 .entertainment-copy strong { display: -webkit-box; overflow: hidden; color: var(--ink); font-size: 12px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .entertainment-copy span { color: var(--coral); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
 .entertainment-copy small { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.bangumi-comments-button { justify-self: start; border: 0; padding: 3px 0; background: transparent; color: var(--teal); cursor: pointer; font-size: 10px; }
-.bangumi-comments-button:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-.bangumi-comments-button:disabled { color: var(--faint); cursor: wait; }
-.bangumi-comments { display: grid; gap: 6px; padding-top: 5px; border-top: 1px solid var(--line); }
-.bangumi-comments p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
-.bangumi-comments blockquote { margin: 0; padding: 5px 7px; border-left: 2px solid var(--coral); background: var(--card); }
-.bangumi-comments blockquote footer { margin-top: 3px; color: var(--faint); font-size: 9px; }
-.entertainment-link-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 66px; padding: 10px 20px; border-bottom: 1px solid var(--line); text-decoration: none; }
-.entertainment-link-row:hover { background: var(--paper-deep); }
-.entertainment-link-mark { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--teal); font-size: 12px; font-weight: 700; }
-.entertainment-link-row > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
-.entertainment-link-row strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.entertainment-link-row small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.entertainment-link-row b { color: var(--faint); font-size: 10px; font-weight: 500; }
 .entertainment-empty { margin: 0; padding: 18px 20px 22px; color: var(--muted); font-size: 12px; }
 .tft-panel { grid-column: 1 / -1; border-top: 2px solid var(--ink); background: var(--card); }
 .tft-hero { display: flex; align-items: end; justify-content: space-between; gap: 24px; min-height: 170px; padding: 25px 27px 24px; background: #e8e6dd; }
@@ -412,7 +403,7 @@ select { height: 38px; padding: 0 31px 0 12px; border: 1px solid var(--line); bo
   .entertainment-anime-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 11px; }
   .entertainment-head { padding-right: 13px; padding-left: 13px; }
   .entertainment-mode-controls { padding: 9px 13px 0; }
-  .entertainment-link-row { padding-right: 13px; padding-left: 13px; }
+  .entertainment-region-tabs { padding-right: 13px; padding-left: 13px; }
   .tft-hero { align-items: flex-start; flex-direction: column; gap: 18px; padding: 22px 20px; }
   .tft-hero h3 { font-size: 26px; }
   .tft-links { grid-template-columns: 1fr; padding: 11px 11px 0; }

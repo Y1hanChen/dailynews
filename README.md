@@ -9,7 +9,7 @@
 - 金融资讯：雪球、知乎、东方财富、财新入口和资讯流
 - 游戏：Steam 当前特惠列表与云顶之弈 TFT 数据，作为两个子板块展示
 - NBA：今日赛程和比分
-- 文娱：Bangumi 番剧评分/排名，以及红果短剧和小说榜单入口
+- 文娱：Bangumi 放送中新番和按季度查询的完结番
 
 市场、游戏和竞技栏目使用独立的数据源适配器，页面只消费统一后的条目结构。
 
@@ -101,7 +101,9 @@ https://www.zhihu.com/api/v4/columns/jiqizhixin/articles
 - 金融地图使用本地 GeoJSON 国家轮廓，地图只做区域信号可视化，精确涨跌仍以底部读数为准。
 - Steam 使用商店特惠接口，只提供当前折扣；历史最低价需要另接价格历史服务。页面用价格榜而不是资讯卡片展示。
 - NBA 使用官方 CDN 赛果 JSON。赛季休赛期或接口风控时会显示缓存/示例。
-- Bangumi 使用公开的 `/v0/calendar` 接口获取放送中的新番，展示放送日、评分、排名和 Bangumi 海报；“完结番”筛选通过 `/v0/search/subjects` 按年份和月份查询，不再混入全站历史番剧总榜。番剧卡片支持按需加载高赞评论，服务端会优先尝试 `p1/subject/{id}/comments`，再回退到 subject posts，并做短时缓存。红果短剧目前没有面向个人开发者的稳定公开榜单接口；小说榜单的站内接口通常需要动态请求或登录，因此先保留官方页面入口并标记为示例，后续接入公开源时再替换，不把示例当实时数据。
+- Bangumi 使用公开的 `/v0/calendar` 接口获取放送中的新番，展示放送日、评分、排名和 Bangumi 海报；“完结番”筛选通过 `/v0/search/subjects` 按季度起始月份（1、4、7、10 月）查询，不再混入全站历史番剧总榜。列表默认日本动画，可切换全部地区、中国动画和其他地区；地区优先使用 Bangumi 元标签，没有元标签时使用原名的日文字符作为保守判断，因此像 RE:Zero 这类日漫不会被国漫挤出首屏。Bangumi 没有稳定公开的主题评论接口，因此页面不展示不可验证的评论数据。
+
+红果短剧和小说榜单暂时从看板配置中注释掉，待找到稳定公开接口后再恢复，避免显示示例或失效入口。
 
 ### TFT 临时停用
 
@@ -132,8 +134,7 @@ RIOT_TFT_MIN_GAMES=2
 GET /api/dashboard
 GET /api/dashboard?refresh=1
 GET /api/health
-GET /api/bangumi?mode=completed&year=2025&month=3
-GET /api/bangumi/comments?subject_id=123
+GET /api/bangumi?mode=completed&year=2025&month=1
 ```
 
 所有来源都被归一为以下字段：
@@ -154,6 +155,8 @@ GET /api/bangumi/comments?subject_id=123
 }
 ```
 
+Bangumi 番剧条目还会附带 `score`、`rank`、`air_date`、`air_weekday`、`original_title`、`region` 和 `region_label`。`region` 可能是 `jp`、`cn`、`other` 或 `unknown`；当接口没有地区元数据时，服务端只用原名中的日文字符做保守识别，不把推测当成确定来源。
+
 新增来源时，优先在 `SOURCE_CONFIG` 中增加配置，并实现一个小型解析函数，将结果转换成上述结构。不要让页面直接依赖第三方返回格式。
 
 ## 缓存和失败策略
@@ -161,6 +164,7 @@ GET /api/bangumi/comments?subject_id=123
 - 进程内缓存 15 分钟，避免刷新页面时重复请求外站。
 - 成功抓取后写入 `.cache.json`，服务重启仍可显示上次结果。
 - 外部源失败时优先使用磁盘缓存，首次运行才显示内置示例。
+- Bangumi 旧版本缓存没有放送状态，接口失败时会丢弃这类历史排行缓存，避免把完结番误显示为放送中新番。
 - 页面只在用户点击刷新时强制绕过进程内缓存。
 
 ## 迭代路线

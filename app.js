@@ -5,8 +5,9 @@ const state = {
   marketScope: "all",
   gameSubsection: "steam",
   animeMode: "airing",
+  animeRegion: "jp",
   animeYear: new Date().getFullYear(),
-  animeMonth: new Date().getMonth() + 1,
+  animeMonth: [10, 7, 4, 1].find((month) => month <= new Date().getMonth() + 1) || 1,
   bangumiAiringItems: [],
   bangumiCompletedItems: [],
   bangumiRequestId: 0,
@@ -207,9 +208,18 @@ function updateDate() {
 
 function renderCards() {
   const query = state.query.trim().toLowerCase();
-  const filtered = currentSectionItems()
+  const scopedItems = currentSectionItems()
     .filter((item) => state.source === "all" || item.source_id === state.source)
-    .filter((item) => !query || `${item.title} ${item.summary} ${item.source}`.toLowerCase().includes(query))
+    .filter((item) => !query || `${item.title} ${item.summary} ${item.source}`.toLowerCase().includes(query));
+
+  // Entertainment has its own ranking (region, score, then Bangumi rank),
+  // instead of the date sort used by the news feed.
+  if (state.section === "entertainment") {
+    renderEntertainment(scopedItems);
+    return;
+  }
+
+  const filtered = scopedItems
     .sort((a, b) => state.sort === "heat"
       ? (b.heat || 0) - (a.heat || 0) || b.published_at.localeCompare(a.published_at)
       : b.published_at.localeCompare(a.published_at));
@@ -232,11 +242,6 @@ function renderCards() {
 
   if (state.section === "game" && state.gameSubsection === "tft") {
     renderTftPanel(filtered);
-    return;
-  }
-
-  if (state.section === "entertainment") {
-    renderEntertainment(filtered);
     return;
   }
 
@@ -546,36 +551,47 @@ function entertainmentImage(item) {
 
 function renderEntertainment(items) {
   const grid = $("#feed-grid");
-  const anime = items.filter((item) => item.entertainment_kind === "anime");
-  const shortDrama = items.filter((item) => item.entertainment_kind === "short-drama");
-  const novels = items.filter((item) => item.entertainment_kind === "novel");
+  const allAnime = items.filter((item) => item.entertainment_kind === "anime");
+  const anime = allAnime
+    .filter((item) => state.animeRegion === "all" || item.region === state.animeRegion)
+    .sort((a, b) => {
+      const regionRank = { jp: 0, other: 1, unknown: 2, cn: 3 };
+      return (regionRank[a.region] ?? 2) - (regionRank[b.region] ?? 2)
+        || Number(b.score || b.metrics?.["评分"] || 0) - Number(a.score || a.metrics?.["评分"] || 0)
+        || (Number(a.rank || a.metrics?.["排名"] || 999999) - Number(b.rank || b.metrics?.["排名"] || 999999))
+        || String(b.air_date || "").localeCompare(String(a.air_date || ""));
+    })
+    .slice(0, 30);
   const animeRows = anime.map((item, index) => {
     const score = Number(item.score || item.metrics?.["评分"] || 0);
     const rank = Number(item.rank || item.metrics?.["排名"] || 0);
     const airLabel = state.animeMode === "completed"
       ? ["完结", item.air_date].filter(Boolean).join(" · ")
       : [item.air_weekday, item.air_date].filter(Boolean).join(" · ");
-    const subjectId = String(item.subject_id || "");
-    return `<article class="entertainment-anime-card" data-subject-id="${escapeHtml(subjectId)}"><a class="entertainment-anime-main" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="entertainment-poster">${entertainmentImage(item)}<i>${rank || String(index + 1).padStart(2, "0")}</i></div><div class="entertainment-copy"><strong>${escapeHtml(item.title)}</strong><span>${score ? `评分 ${score.toFixed(1)}` : "暂无评分"}${airLabel ? ` · ${escapeHtml(airLabel)}` : ""}</span><small>${escapeHtml(item.summary || (state.animeMode === "completed" ? "Bangumi 完结番条目" : "Bangumi 放送中新番"))}</small></div></a>${subjectId ? `<button class="bangumi-comments-button" type="button" data-bangumi-comments>高赞评论</button><div class="bangumi-comments" data-comments-container hidden></div>` : ""}</article>`;
+    const regionLabel = item.region_label || "地区未标注";
+    const title = item.original_title && item.original_title !== item.title ? `${item.title} / ${item.original_title}` : item.title;
+    return `<article class="entertainment-anime-card"><a class="entertainment-anime-main" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="entertainment-poster">${entertainmentImage(item)}<i>${rank || String(index + 1).padStart(2, "0")}</i></div><div class="entertainment-copy"><strong title="${escapeHtml(title)}">${escapeHtml(item.title)}</strong><span>${escapeHtml(regionLabel)}${score ? ` · 评分 ${score.toFixed(1)}` : " · 暂无评分"}${airLabel ? ` · ${escapeHtml(airLabel)}` : ""}</span><small>${escapeHtml(item.summary || (state.animeMode === "completed" ? "Bangumi 完结番条目" : "Bangumi 放送中新番"))}</small></div></a></article>`;
   }).join("");
   const nowYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: nowYear - 2010 + 1 }, (_, index) => nowYear - index).map((year) => `<option value="${year}"${Number(state.animeYear) === year ? " selected" : ""}>${year} 年</option>`).join("");
-  const monthOptions = Array.from({ length: 12 }, (_, index) => index + 1).map((month) => `<option value="${month}"${Number(state.animeMonth) === month ? " selected" : ""}>${month} 月</option>`).join("");
-  const modeControls = `<div class="entertainment-mode-controls"><div class="entertainment-mode-tabs" role="tablist" aria-label="番剧范围"><button type="button" class="${state.animeMode === "airing" ? "is-active" : ""}" data-anime-mode="airing">放送中</button><button type="button" class="${state.animeMode === "completed" ? "is-active" : ""}" data-anime-mode="completed">完结番</button></div>${state.animeMode === "completed" ? `<label>年份<select id="bangumi-year">${yearOptions}</select></label><label>月份<select id="bangumi-month">${monthOptions}</select></label>` : ""}</div>`;
-  const linkRows = (list, empty) => list.length ? list.map((item) => `<a class="entertainment-link-row" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><span class="entertainment-link-mark">${escapeHtml(String(item.title || "文").slice(0, 1))}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.summary || "")}</small></span><b>${item.sample ? "示例" : "打开"} ↗</b></a>`).join("") : `<p class="entertainment-empty">${empty}</p>`;
+  const seasonOptions = [1, 4, 7, 10].map((month) => `<option value="${month}"${Number(state.animeMonth) === month ? " selected" : ""}>${month} 月番</option>`).join("");
+  const seasonLabel = `${state.animeYear} 年 ${state.animeMonth} 月番`;
+  const regionOptions = [["jp", "日本动画"], ["all", "全部地区"], ["cn", "中国动画"], ["other", "其他地区"]];
+  const regionLabel = regionOptions.find(([value]) => value === state.animeRegion)?.[1] || "全部地区";
+  const regionControls = `<div class="entertainment-region-tabs" role="tablist" aria-label="番剧地区">${regionOptions.map(([value, label]) => `<button type="button" class="${state.animeRegion === value ? "is-active" : ""}" data-anime-region="${value}">${label}${value === "all" ? ` <span>${allAnime.length}</span>` : ""}</button>`).join("")}</div>`;
+  const modeControls = `<div class="entertainment-mode-controls"><div class="entertainment-mode-tabs" role="tablist" aria-label="番剧范围"><button type="button" class="${state.animeMode === "airing" ? "is-active" : ""}" data-anime-mode="airing">放送中</button><button type="button" class="${state.animeMode === "completed" ? "is-active" : ""}" data-anime-mode="completed">完结番</button></div>${state.animeMode === "completed" ? `<label>季度<select id="bangumi-season">${seasonOptions}</select></label><label>年份<select id="bangumi-year">${yearOptions}</select></label>` : ""}</div>`;
   const animeContent = state.animeLoading
-    ? `<p class="entertainment-empty">正在加载 ${state.animeYear} 年 ${state.animeMonth} 月番剧…</p>`
+    ? `<p class="entertainment-empty">正在加载 ${state.animeMode === "completed" ? seasonLabel : "放送中的番剧"}…</p>`
     : state.animeError
       ? `<p class="entertainment-empty">${escapeHtml(state.animeError)}</p>`
-      : animeRows || `<p class="entertainment-empty">${state.animeMode === "completed" ? `${state.animeYear} 年 ${state.animeMonth} 月暂无番剧条目。` : "Bangumi 暂时没有返回放送中的新番。"}</p>`;
+      : animeRows || `<p class="entertainment-empty">${state.animeMode === "completed" ? `${seasonLabel}暂无番剧条目。` : `${regionLabel}暂无放送中的番剧，切换“全部地区”查看其他条目。`}</p>`;
   grid.innerHTML = `<div class="entertainment-board">
     <section class="entertainment-feature">
       <div class="entertainment-head"><span>${state.animeMode === "completed" ? "完结番评分" : "放送中新番"}</span><a href="https://bgm.tv/anime" target="_blank" rel="noreferrer">打开 Bangumi ↗</a></div>
       ${modeControls}
+      ${regionControls}
       ${animeRows && !state.animeLoading && !state.animeError ? `<div class="entertainment-anime-grid">${animeRows}</div>` : animeContent}
     </section>
-    <section class="entertainment-list-section"><div class="entertainment-head"><span>红果短剧热榜</span><span>短剧</span></div>${linkRows(shortDrama, "红果暂无稳定公开榜单接口，先保留官方入口。")}</section>
-    <section class="entertainment-list-section"><div class="entertainment-head"><span>小说榜单</span><span>起点</span></div>${linkRows(novels, "小说榜单接口待接入，先保留公开榜单入口。")}</section>
   </div>`;
   bindEntertainmentEvents();
 }
@@ -592,15 +608,18 @@ function bindEntertainmentEvents() {
       loadBangumiCompleted();
     }
   }));
+  $$('[data-anime-region]').forEach((button) => button.addEventListener("click", () => {
+    state.animeRegion = button.dataset.animeRegion || "all";
+    renderCards();
+  }));
   $("#bangumi-year")?.addEventListener("change", (event) => {
     state.animeYear = Number(event.target.value);
     loadBangumiCompleted();
   });
-  $("#bangumi-month")?.addEventListener("change", (event) => {
+  $("#bangumi-season")?.addEventListener("change", (event) => {
     state.animeMonth = Number(event.target.value);
     loadBangumiCompleted();
   });
-  $$('[data-bangumi-comments]').forEach((button) => button.addEventListener("click", loadBangumiComments));
 }
 
 function replaceBangumiItems(items) {
@@ -632,38 +651,6 @@ async function loadBangumiCompleted() {
       state.animeLoading = false;
       replaceBangumiItems(state.bangumiCompletedItems);
     }
-  }
-}
-
-async function loadBangumiComments(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  const button = event.currentTarget;
-  const card = button.closest("[data-subject-id]");
-  const container = card?.querySelector("[data-comments-container]");
-  const subjectId = card?.dataset.subjectId;
-  if (!container || !subjectId) return;
-  if (!container.hidden) {
-    container.hidden = true;
-    button.textContent = "高赞评论";
-    return;
-  }
-  button.disabled = true;
-  button.textContent = "加载评论…";
-  try {
-    const response = await fetch(`/api/bangumi/comments?subject_id=${encodeURIComponent(subjectId)}`, { cache: "no-store" });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-    const comments = Array.isArray(payload.comments) ? payload.comments : [];
-    container.innerHTML = comments.length
-      ? comments.map((comment) => `<blockquote><p>${escapeHtml(comment.content)}</p><footer>${escapeHtml(comment.user || "匿名用户")} · 赞 ${Number(comment.likes || 0).toLocaleString("zh-CN")}</footer></blockquote>`).join("")
-      : `<p>暂无可展示的高赞评论。</p>`;
-  } catch (error) {
-    container.innerHTML = `<p>评论暂不可用：${escapeHtml(error.message || "接口失败")}</p>`;
-  } finally {
-    container.hidden = false;
-    button.disabled = false;
-    button.textContent = "收起评论";
   }
 }
 
@@ -773,6 +760,11 @@ async function loadData(force = false) {
     state.animeLoading = false;
     state.animeError = "";
     state.bangumiAiringItems = state.items.filter((item) => item.source_id === "bangumi-anime");
+    // Keep an old cache visible if it predates region metadata; users can then
+    // explicitly choose 日本动画 after the next successful refresh.
+    if (state.animeRegion === "jp" && state.bangumiAiringItems.length && !state.bangumiAiringItems.some((item) => item.region === "jp")) {
+      state.animeRegion = "all";
+    }
     state.bangumiCompletedItems = [];
     renderSourceFilters();
     renderCounts();
