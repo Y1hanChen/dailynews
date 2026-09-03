@@ -549,14 +549,20 @@ function entertainmentImage(item) {
     : `<span class="entertainment-poster-fallback">${escapeHtml(String(item.title || "文").slice(0, 1))}</span>`;
 }
 
+function animeRegionOf(item) {
+  if (item.region) return item.region;
+  const originalTitle = String(item.original_title || item.title || "");
+  return /[\u3040-\u30ff]/.test(originalTitle) ? "jp" : "unknown";
+}
+
 function renderEntertainment(items) {
   const grid = $("#feed-grid");
   const allAnime = items.filter((item) => item.entertainment_kind === "anime");
   const anime = allAnime
-    .filter((item) => state.animeRegion === "all" || item.region === state.animeRegion)
+    .filter((item) => state.animeRegion === "all" || animeRegionOf(item) === state.animeRegion)
     .sort((a, b) => {
       const regionRank = { jp: 0, other: 1, unknown: 2, cn: 3 };
-      return (regionRank[a.region] ?? 2) - (regionRank[b.region] ?? 2)
+      return (regionRank[animeRegionOf(a)] ?? 2) - (regionRank[animeRegionOf(b)] ?? 2)
         || Number(b.score || b.metrics?.["评分"] || 0) - Number(a.score || a.metrics?.["评分"] || 0)
         || (Number(a.rank || a.metrics?.["排名"] || 999999) - Number(b.rank || b.metrics?.["排名"] || 999999))
         || String(b.air_date || "").localeCompare(String(a.air_date || ""));
@@ -568,7 +574,7 @@ function renderEntertainment(items) {
     const airLabel = state.animeMode === "completed"
       ? ["完结", item.air_date].filter(Boolean).join(" · ")
       : [item.air_weekday, item.air_date].filter(Boolean).join(" · ");
-    const regionLabel = item.region_label || "地区未标注";
+    const regionLabel = item.region_label || ({ jp: "日本动画", cn: "中国动画", other: "其他地区" }[animeRegionOf(item)] || "地区未标注");
     const title = item.original_title && item.original_title !== item.title ? `${item.title} / ${item.original_title}` : item.title;
     return `<article class="entertainment-anime-card"><a class="entertainment-anime-main" href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noreferrer"><div class="entertainment-poster">${entertainmentImage(item)}<i>${rank || String(index + 1).padStart(2, "0")}</i></div><div class="entertainment-copy"><strong title="${escapeHtml(title)}">${escapeHtml(item.title)}</strong><span>${escapeHtml(regionLabel)}${score ? ` · 评分 ${score.toFixed(1)}` : " · 暂无评分"}${airLabel ? ` · ${escapeHtml(airLabel)}` : ""}</span><small>${escapeHtml(item.summary || (state.animeMode === "completed" ? "Bangumi 完结番条目" : "Bangumi 放送中新番"))}</small></div></a></article>`;
   }).join("");
@@ -642,10 +648,15 @@ async function loadBangumiCompleted() {
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     if (requestId !== state.bangumiRequestId) return;
     state.bangumiCompletedItems = Array.isArray(payload.items) ? payload.items : [];
+    if (state.animeRegion === "jp" && state.bangumiCompletedItems.length && !state.bangumiCompletedItems.some((item) => animeRegionOf(item) === "jp")) {
+      state.animeRegion = "all";
+    }
+    updateBangumiStatus("live", state.bangumiCompletedItems.length);
   } catch (error) {
     if (requestId !== state.bangumiRequestId) return;
     state.bangumiCompletedItems = [];
     state.animeError = `完结番加载失败：${error.message || "Bangumi 接口暂不可用"}`;
+    updateBangumiStatus("sample", 0, error.message || "Bangumi 接口暂不可用");
   } finally {
     if (requestId === state.bangumiRequestId) {
       state.animeLoading = false;
@@ -735,6 +746,17 @@ function renderStatuses(statuses = []) {
     const reason = status.error ? " · 源失败" : "";
     return `<div class="status-line"${status.error ? ` title="${escapeHtml(status.error)}"` : ""}><span>${escapeHtml(status.name)}</span><span class="${className}">${label} · ${status.count || 0}${reason}</span></div>`;
   }).join("");
+}
+
+function updateBangumiStatus(stateName, count, error = "") {
+  const status = state.payload?.statuses?.find((item) => item.id === "bangumi-anime");
+  if (!status) return;
+  status.state = stateName;
+  status.count = count;
+  if (error) status.error = error;
+  else delete status.error;
+  renderStatuses(state.payload.statuses);
+  setConnectionState(state.payload.statuses);
 }
 
 function setConnectionState(statuses = []) {
